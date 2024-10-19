@@ -10,6 +10,7 @@ import aiomysql
 import csv
 import io
 
+
 async def read_csv(file_path: str) -> AsyncGenerator[List[str], None]:
     async with aiofiles.open(file_path, mode='r') as f:
         # Используя io.StringIO для чтения построчно
@@ -34,7 +35,6 @@ async def insert_data_into_db(data: List[str]) -> None:
 async def main(file_path: str) -> None:
     async for row in read_csv(file_path):
         await insert_data_into_db(row)
-
 
 
 if __name__ == '__main__':
