@@ -6,7 +6,7 @@ __deprecated__ = False
 __email__ = 'ADmin@TkYD.ru'
 __maintainer__ = 'InfSub'
 __status__ = 'Development'  # 'Production / Development'
-__version__ = '2.5.0'
+__version__ = '2.5.1'
 
 from asyncio import run as async_run, sleep, create_task, gather
 from pprint import pprint
@@ -18,7 +18,7 @@ from logger import logging, setup_logger
 from config import get_smb_config, get_schedule_config
 from smb_handler import run as smb_run
 from csv_handler import CSVHandler
-from convert_charset import convert_encoding
+# from convert_charset import convert_encoding
 from server_status import AsyncKeyValueStore
 
 setup_logger()
@@ -58,10 +58,11 @@ async def perform_smb_task(srv_status, shop_id: str) -> None:
         logger.debug(f'Время подключения к "{hostname}": {time() - start_connect_time:.2f} секунд.')
 
         if file_path:
-            try:
-                await convert_encoding(file_path)  # Конвертируем файл в UTF-8, если необходимо
-            except Exception as e:
-                logger.error(f'Ошибка при конвертации файла магазина {shop_id} в UTF-8: {e}')
+            # convert_encoding перенесен в класс CSVHandler
+            # try:
+            #     await convert_encoding(file_path)  # Конвертируем файл в UTF-8, если необходимо
+            # except Exception as e:
+            #     logger.error(f'Ошибка при конвертации файла магазина {shop_id} в UTF-8: {e}')
 
             try:
                 handler = CSVHandler()

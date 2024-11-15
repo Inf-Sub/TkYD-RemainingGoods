@@ -6,7 +6,7 @@ __deprecated__ = False
 __email__ = 'ADmin@TkYD.ru'
 __maintainer__ = 'InfSub'
 __status__ = 'Production'
-__version__ = '2.5.0'
+__version__ = '2.5.2'
 
 from os.path import join as os_join
 from csv import DictReader as csv_DictReader
@@ -14,6 +14,7 @@ from aiofiles import open as aio_open
 from chardet import detect as char_detect
 from typing import List, Dict, Any, Optional
 from pathlib import Path
+from re import findall as re_findall
 from config import get_csv_config
 
 from logger import logging, setup_logger
@@ -93,30 +94,140 @@ class CSVHandler:
             raise
         return data
 
+    # version 2.5.2
     @staticmethod
     def validate_data(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        def is_valid_ean13(barcode_ean13: str) -> bool:
+            if len(barcode_ean13) != 13 or not barcode_ean13.isdigit():
+                return False
+            sum_even = sum(int(barcode_ean13[i]) for i in range(1, 12, 2))
+            sum_odd = sum(int(barcode_ean13[i]) for i in range(0, 12, 2))
+            checksum = (10 - (sum_odd + 3 * sum_even) % 10) % 10
+            return checksum == int(barcode_ean13[-1])
+
+        def extract_number_from_string(value: str) -> Optional[float]:
+            matches = re_findall(r'\d+\.?\d*', value)  # Поиск чисел в строке
+            if matches:
+                return float(matches[0])  # Преобразование первого найденного числа в float
+            return None
+
         valid_data = []
+
         try:
             for row in data:
-                check_key = 'Packing.Barcode'
-                if check_key in row and isinstance(row[check_key], str):
-                    check_key = 'Packing.СвободныйОстаток'
-                    free_stock = row.get(check_key)
-                    if free_stock is not None:
-                        try:
-                            # Преобразуем к float и проверяем успешность преобразования
-                            float(free_stock)
-                            valid_data.append(row)
-                        except ValueError:
-                            logger.warning(f'Invalid numeric value: "{free_stock}" in "{check_key}": {row}')
+                check_key_barcode = 'Packing.Barcode'
+                check_key_stock = 'Packing.СвободныйОстаток'
+                check_key_width = 'Packing.Ширина'
+                max_width = 200  # 200 mm
+
+                if check_key_barcode in row and isinstance(row[check_key_barcode], str):
+                    barcode = row[check_key_barcode]
+
+                    # Проверка поля 'Packing.Barcode' на валидность значения, также информативная проверка
+                    # на корректность EAN-13
+                    if len(barcode) == 13 and barcode.isdigit():
+                        if not is_valid_ean13(barcode):
+                            logger.info(f'Invalid EAN-13 barcode: "{barcode}". This is "CODE-128".')
+
+                        # Проверка поля 'Packing.СвободныйОстаток' на наличие числа (не пусто) и не равно NoneType
+                        free_stock = row.get(check_key_stock)
+
+                        if free_stock is not None:
+                            try:
+                                float(free_stock)
+                            except ValueError:
+                                logger.warning(f'Invalid numeric value: "{free_stock}" in "{check_key_stock}": {row}')
+                                continue  # Пропускаем этот ряд, так как значение не является числом
+                        else:
+                            logger.warning(f'None value found in "{check_key_stock}": {row}')
+                            continue  # Пропускаем этот ряд, так как значение отсутствует
+
+                        # Проверка поля 'Packing.Ширина' и получение из него цифрового значения <= max_width
+                        width_value = row.get(check_key_width, '')
+                        extracted_number = extract_number_from_string(width_value)
+                        if extracted_number is not None and extracted_number <= max_width:
+                            row[check_key_width] = extracted_number
+                        else:
+                            row[check_key_width] = ''  # Устанавливаем пустое значение, если число не найдено
+
+                        valid_data.append(row)
                     else:
-                        logger.warning(f'None value found in "{check_key}": {row}')
+                        logger.warning(f'Invalid barcode: "{barcode}": {row}')
                 else:
-                    logger.warning(f'Invalid data: {row}')
+                    logger.warning(f'Missing or invalid barcode key in data: {row}')
         except Exception as e:
             logger.error(f'Error validating data: {e}')
             raise
+
         return valid_data
+
+    # # version 2.5.1
+    # @staticmethod
+    # def validate_data(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    #     def is_valid_ean13(barcode: str) -> bool:
+    #         if len(barcode) != 13 or not barcode.isdigit():
+    #             return False
+    #         # Проверка контрольной суммы для формата EAN-13
+    #         sum_even = sum(int(barcode[i]) for i in range(1, 12, 2))
+    #         sum_odd = sum(int(barcode[i]) for i in range(0, 12, 2))
+    #         checksum = (10 - (sum_odd + 3 * sum_even) % 10) % 10
+    #         return checksum == int(barcode[-1])
+    #
+    #     valid_data = []
+    #     try:
+    #         for row in data:
+    #             check_key = 'Packing.Barcode'
+    #             if check_key in row and isinstance(row[check_key], str):
+    #                 barcode = row[check_key]
+    #                 if len(barcode) == 13 and barcode.isdigit():
+    #                     if not is_valid_ean13(barcode):
+    #                         logger.info(f'Barcode "{barcode}" is not a valid EAN-13 format: {row}')
+    #
+    #                     check_key = 'Packing.СвободныйОстаток'
+    #                     free_stock = row.get(check_key)
+    #                     if free_stock is not None:
+    #                         try:
+    #                             # Преобразуем к float и проверяем успешность преобразования
+    #                             float(free_stock)
+    #                             valid_data.append(row)
+    #                         except ValueError:
+    #                             logger.warning(f'Invalid numeric value: "{free_stock}" in "{check_key}": {row}')
+    #                     else:
+    #                         logger.warning(f'None value found in "{check_key}": {row}')
+    #                 else:
+    #                     logger.warning(f'Invalid barcode length or non-digit characters: "{barcode}": {row}')
+    #             else:
+    #                 logger.warning(f'Invalid data: {row}')
+    #     except Exception as e:
+    #         logger.error(f'Error validating data: {e}')
+    #         raise
+    #     return valid_data
+
+    # # version 2.5.0
+    # @staticmethod
+    # def validate_data(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    #     valid_data = []
+    #     try:
+    #         for row in data:
+    #             check_key = 'Packing.Barcode'
+    #             if check_key in row and isinstance(row[check_key], str):
+    #                 check_key = 'Packing.СвободныйОстаток'
+    #                 free_stock = row.get(check_key)
+    #                 if free_stock is not None:
+    #                     try:
+    #                         # Преобразуем к float и проверяем успешность преобразования
+    #                         float(free_stock)
+    #                         valid_data.append(row)
+    #                     except ValueError:
+    #                         logger.warning(f'Invalid numeric value: "{free_stock}" in "{check_key}": {row}')
+    #                 else:
+    #                     logger.warning(f'None value found in "{check_key}": {row}')
+    #             else:
+    #                 logger.warning(f'Invalid data: {row}')
+    #     except Exception as e:
+    #         logger.error(f'Error validating data: {e}')
+    #         raise
+    #     return valid_data
 
     async def process_csv(self, file_path: str) -> List[Dict[str, Any]]:
         try:
@@ -141,7 +252,7 @@ if __name__ == '__main__':
     valid_records = async_run(handler.process_csv(csv_file_path))
 
     if valid_records:
-        print('Валидация прошла успешно, обработанные записи:')
+        print(f'Валидация прошла успешно, обработано записей: {len(valid_records)}')
         # for record in valid_records:
         #     print(record)
     else:
