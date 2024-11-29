@@ -9,7 +9,7 @@ __status__ = 'Development'  # 'Production / Development'
 __version__ = '2.5.1'
 
 from asyncio import run as async_run, sleep, create_task, gather
-from pprint import pprint
+# from pprint import pprint
 from time import time
 from datetime import datetime as dt
 # from os.path import join as os_join
@@ -70,6 +70,7 @@ async def perform_smb_task(srv_status, shop_id: str) -> None:
 
                 if valid_records:
                     logger.info('Validation successful.')
+                    # импортируем данные в БД
                 else:
                     logger.warning('Failed to process records.')
 

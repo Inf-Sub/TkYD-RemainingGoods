@@ -1,12 +1,12 @@
 __author__ = 'InfSub'
 __contact__ = 'ADmin@TkYD.ru'
 __copyright__ = 'Copyright (C) 2024, [LegioNTeaM] InfSub'
-__date__ = '2024/11/16'
+__date__ = '2024/11/27'
 __deprecated__ = False
 __email__ = 'ADmin@TkYD.ru'
 __maintainer__ = 'InfSub'
 __status__ = 'Production'
-__version__ = '2.5.2'
+__version__ = '2.5.3'
 
 from os.path import join as os_join
 from csv import DictReader as csv_DictReader
@@ -94,9 +94,8 @@ class CSVHandler:
             raise
         return data
 
-    # version 2.5.2
-    @staticmethod
-    def validate_data(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    # version 2.5.3
+    def validate_data(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         def is_valid_ean13(barcode_ean13: str) -> bool:
             if len(barcode_ean13) != 13 or not barcode_ean13.isdigit():
                 return False
@@ -126,7 +125,7 @@ class CSVHandler:
                     # Проверка поля 'Packing.Barcode' на валидность значения, также информативная проверка
                     # на корректность EAN-13
                     if len(barcode) == 13 and barcode.isdigit():
-                        if not is_valid_ean13(barcode):
+                        if self.env['invalid_ean13'] and not is_valid_ean13(barcode):
                             logger.info(f'Invalid EAN-13 barcode: "{barcode}". This is "CODE-128".')
 
                         # Проверка поля 'Packing.СвободныйОстаток' на наличие числа (не пусто) и не равно NoneType

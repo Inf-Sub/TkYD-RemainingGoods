@@ -166,5 +166,5 @@ DCT_*/
 *.csv
 run_*.py
 *_v*.py
-yest_*.py
+test_*.py
 work/

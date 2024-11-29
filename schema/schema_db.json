@@ -1,0 +1,16 @@
+{
+   "table": [
+       "table_products.sql",
+       "table_currencies.sql",
+       "table_materials.sql",
+       "table_product_materials.sql",
+       "table_product_photos.sql",
+       "table_warehouses.sql",
+       "table_product_quantity.sql",
+       "table_product_prices.sql",
+       "table_storage_location_descriptions.sql",
+       "table_storage_location_names.sql",
+       "table_storage_location_comments.sql",
+       "table_storage_locations.sql"
+   ]
+}

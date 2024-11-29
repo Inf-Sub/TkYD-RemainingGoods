@@ -1,15 +1,16 @@
 __author__ = 'InfSub'
 __contact__ = 'ADmin@TkYD.ru'
 __copyright__ = 'Copyright (C) 2024, [LegioNTeaM] InfSub'
-__date__ = '2024/11/12'
+__date__ = '2024/11/28'
 __deprecated__ = False
 __email__ = 'ADmin@TkYD.ru'
 __maintainer__ = 'InfSub'
 __status__ = 'Production'
-__version__ = '2.3.0'
+__version__ = '2.5.2'
 
 from os import getenv
 from os.path import join
+# from decouple import config
 from dotenv import load_dotenv
 from datetime import datetime as dt
 
@@ -24,10 +25,14 @@ def load_env() -> dict:
     # Загрузка всех переменных, которые могут понадобиться в проекте
     return {
         'DB_HOST': getenv('DB_HOST'),
-        'DB_PORT': getenv('DB_PORT'),
+        'DB_PORT': int(getenv('DB_PORT')),
         'DB_USER': getenv('DB_USER'),
         'DB_PASSWORD': getenv('DB_PASSWORD'),
         'DB_NAME': getenv('DB_NAME'),
+        'DB_SCHEMA_DIR': getenv('DB_SCHEMA_DIR'),
+        'DB_FILE_INIT_SCHEMA': getenv('DB_FILE_INIT_SCHEMA'),
+        'DB_FILE_TABLE_PREFIX': getenv('DB_FILE_TABLE_PREFIX'),
+        'DB_FILE_INIT_DATA_PREFIX': getenv('DB_FILE_INIT_DATA_PREFIX'),
 
         'SMB_HOSTS': getenv('SHOPS'),
         'SMB_PORT': int(getenv('SMB_PORT')),
@@ -43,6 +48,8 @@ def load_env() -> dict:
         'SMB_LOAD_FILE_PATTERN': getenv('SMB_LOAD_FILE_PATTERN'),
 
         'CSV_DELIMITER': getenv('CSV_DELIMITER'),
+
+        'INVALID_EAN13': getenv('INVALID_EAN13', False).lower() in ('true', '1', 't', 'y', 'yes'),
 
         'LOG_DIR': getenv('LOG_DIR'),
         'LOG_FILE': getenv('LOG_FILE'),
@@ -68,6 +75,10 @@ def get_db_config() -> dict:
         'user': env['DB_USER'],
         'password': env['DB_PASSWORD'],
         'database': env['DB_NAME'],
+        'db_schema_dir': env['DB_SCHEMA_DIR'],
+        'db_file_init_schema': env['DB_FILE_INIT_SCHEMA'],
+        'db_file_table_prefix': env['DB_FILE_TABLE_PREFIX'],
+        'db_file_init_data_prefix': env['DB_FILE_INIT_DATA_PREFIX'],
     }
 
 
@@ -100,6 +111,7 @@ def get_csv_config() -> dict:
     env = load_env()
     return {
         'csv_delimiter': env['CSV_DELIMITER'],
+        'invalid_ean13': bool(env['INVALID_EAN13']),
 
     }
 

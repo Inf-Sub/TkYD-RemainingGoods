@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "internal_number": 70,
+    "warehouse_short_name": "MSK-WH70",
+    "warehouse_name": "Склад хранения",
+    "currency_id": 1
+  },
+  {
+    "id": 2,
+    "internal_number": 71,
+    "warehouse_short_name": "MSK-LT",
+    "warehouse_name": "ЛегаТессиле (Варшавка)",
+    "currency_id": 1
+  },
+  {
+    "id": 3,
+    "internal_number": 35,
+    "warehouse_short_name": "MSK-IT",
+    "warehouse_name": "Кутюр",
+    "currency_id": 1
+  },
+  {
+    "id": 4,
+    "internal_number": 37,
+    "warehouse_short_name": "MSK-TL",
+    "warehouse_name": "Огород",
+    "currency_id": 1
+  }
+]
