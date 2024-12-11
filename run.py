@@ -1,14 +1,16 @@
 __author__ = 'InfSub'
 __contact__ = 'ADmin@TkYD.ru'
 __copyright__ = 'Copyright (C) 2024, [LegioNTeaM] InfSub'
-__date__ = '2024/11/16'
+__date__ = '2024/12/11'
 __deprecated__ = False
 __email__ = 'ADmin@TkYD.ru'
 __maintainer__ = 'InfSub'
 __status__ = 'Development'  # 'Production / Development'
-__version__ = '2.5.1'
+__version__ = '2.6.0'
 
-from asyncio import run as async_run, sleep, create_task, gather
+from asyncio import (
+    run as aio_run, sleep as aio_sleep, create_task as aio_create_task, gather as aio_gather,
+    get_event_loop as aio_get_event_loop)
 # from pprint import pprint
 from time import time
 from datetime import datetime as dt
@@ -18,6 +20,7 @@ from logger import logging, setup_logger
 from config import get_smb_config, get_schedule_config
 from smb_handler import run as smb_run
 from csv_handler import CSVHandler
+from db import update_data
 # from convert_charset import convert_encoding
 from server_status import AsyncKeyValueStore
 
@@ -71,6 +74,8 @@ async def perform_smb_task(srv_status, shop_id: str) -> None:
                 if valid_records:
                     logger.info('Validation successful.')
                     # импортируем данные в БД
+                    await update_data(shop_id, valid_records)
+                    
                 else:
                     logger.warning('Failed to process records.')
 
@@ -105,16 +110,16 @@ async def run():
     while True:
         start_cycle_time = time()
 
-        tasks = [create_task(perform_smb_task(srv_status, shop_id)) for shop_id in hosts]
+        tasks = [aio_create_task(perform_smb_task(srv_status, shop_id)) for shop_id in hosts]
         # Ждем завершения всех задач
-        await gather(*tasks)
+        await aio_gather(*tasks)
 
         await srv_status.save_to_file()
 
         logger.info(f'Время выполнения цикла: {time() - start_cycle_time:.2f} секунд.')
         logger.info(f'Пауза на: {env["check_interval"]} секунд.')
-        await sleep(env['check_interval'])
+        await aio_sleep(env['check_interval'])
 
 
 if __name__ == '__main__':
-    async_run(run())
+    aio_run(run())

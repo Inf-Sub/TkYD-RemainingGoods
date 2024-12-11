@@ -14,7 +14,7 @@ from aiofiles import open as aio_open
 from chardet import detect as char_detect
 from typing import List, Dict, Any, Optional
 from pathlib import Path
-from re import findall as re_findall
+from re import findall as re_findall, sub as re_sub
 from config import get_csv_config
 
 from logger import logging, setup_logger
@@ -29,15 +29,15 @@ class CSVHandler:
 
     @staticmethod
     async def detect_encoding(file_path: Path, sample_size: int = 1024) -> Optional[str]:
-        try:
-            async with aio_open(file_path, 'rb') as file:
-                raw_data = await file.read(sample_size)
-                result = char_detect(raw_data)
-                encoding = result['encoding']
-                return encoding.lower() if encoding else None
-        except Exception as e:
-            logger.error(f'Unable to determine encoding of file {file_path.name}: {e}.')
-            return None
+        # try:
+        async with aio_open(file_path, 'rb') as file:
+            raw_data = await file.read(sample_size)
+            result = char_detect(raw_data)
+            encoding = result['encoding']
+            return encoding.lower() if encoding else None
+        # except Exception as e:
+        #     logger.error(f'Unable to determine encoding of file {file_path.name}: {e}.')
+        #     return None
 
     async def convert_encoding(
             self, input_file: Path, output_file: Optional[Path] = None, output_encode: str = 'utf-8') -> None:
@@ -94,7 +94,7 @@ class CSVHandler:
             raise
         return data
 
-    # version 2.5.3
+    # version 2.5.4
     def validate_data(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         def is_valid_ean13(barcode_ean13: str) -> bool:
             if len(barcode_ean13) != 13 or not barcode_ean13.isdigit():
@@ -117,6 +117,7 @@ class CSVHandler:
                 check_key_barcode = 'Packing.Barcode'
                 check_key_stock = 'Packing.СвободныйОстаток'
                 check_key_width = 'Packing.Ширина'
+                check_key_factory_address = 'Packing.АдресПроизводителя'
                 max_width = 200  # 200 mm
 
                 if check_key_barcode in row and isinstance(row[check_key_barcode], str):
@@ -131,6 +132,8 @@ class CSVHandler:
                         # Проверка поля 'Packing.СвободныйОстаток' на наличие числа (не пусто) и не равно NoneType
                         free_stock = row.get(check_key_stock)
 
+                        # TODO: Проверить корректную работу continue - скорее всего тут нужна перезапись на пустое
+                        #  значение
                         if free_stock is not None:
                             try:
                                 float(free_stock)
@@ -148,6 +151,15 @@ class CSVHandler:
                             row[check_key_width] = extracted_number
                         else:
                             row[check_key_width] = ''  # Устанавливаем пустое значение, если число не найдено
+
+                        # Проверка поля 'Packing.АдресПроизводителя' и удаление подстроки 'адрес:'
+                        factory_address_value = row.get(check_key_factory_address, '')
+                        if factory_address_value is not None:
+                            factory_address_value = factory_address_value.replace('адрес:', '')
+                            factory_address_value = re_sub(r'\s+', ' ', factory_address_value).strip()
+                            row[check_key_factory_address] = factory_address_value
+                        else:
+                            row[check_key_factory_address] = ''  # Устанавливаем пустое значение, если значение == None
 
                         valid_data.append(row)
                     else:
@@ -243,6 +255,7 @@ class CSVHandler:
 if __name__ == '__main__':
     from asyncio import run as async_run
     from config import get_smb_config
+    from random import randint
 
     smb_config = get_smb_config()
 
@@ -251,7 +264,11 @@ if __name__ == '__main__':
     valid_records = async_run(handler.process_csv(csv_file_path))
 
     if valid_records:
-        print(f'Валидация прошла успешно, обработано записей: {len(valid_records)}')
+        max_num = len(valid_records)
+        print(f'Валидация прошла успешно, обработано записей: {max_num}')
+        num = randint(0, max_num)
+        print(f'Запись #{num}:')
+        print(f'{valid_records[num]}')
         # for record in valid_records:
         #     print(record)
     else:
