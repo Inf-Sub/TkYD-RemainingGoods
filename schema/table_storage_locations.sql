@@ -1,4 +1,4 @@
-create table storage_locations
+CREATE TABLE IF NOT EXISTS storage_locations
 (
     id                 int auto_increment
         primary key,
@@ -13,6 +13,7 @@ create table storage_locations
         foreign key (storage_product_id) references storage_product (id)
             on delete cascade
 )
+    DEFAULT CHARSET=utf8
     comment 'Место Хранения';
 
 create index FK_storage_locations_product_price_and_quantity

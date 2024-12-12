@@ -1,4 +1,4 @@
-create table warehouses
+CREATE TABLE IF NOT EXISTS warehouses
 (
     id                   smallint(3) auto_increment
         primary key,
@@ -12,7 +12,8 @@ create table warehouses
         unique (warehouse_short_name),
     constraint FK_warehouses_currencies
         foreign key (currency_id) references currencies (id)
-);
+)
+    DEFAULT CHARSET=utf8;
 
 
 

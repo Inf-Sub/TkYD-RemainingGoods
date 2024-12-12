@@ -6,12 +6,11 @@ __deprecated__ = False
 __email__ = 'ADmin@TkYD.ru'
 __maintainer__ = 'InfSub'
 __status__ = 'Development'  # 'Production / Development'
-__version__ = '2.6.0'
+__version__ = '2.6.1'
 
-from asyncio import (
-    run as aio_run, sleep as aio_sleep, create_task as aio_create_task, gather as aio_gather,
-    get_event_loop as aio_get_event_loop)
-# from pprint import pprint
+from asyncio import run as aio_run, sleep as aio_sleep, create_task as aio_create_task, gather as aio_gather
+# from asyncio import get_event_loop as aio_get_event_loop
+from pprint import pprint
 from time import time
 from datetime import datetime as dt
 # from os.path import join as os_join
@@ -71,17 +70,21 @@ async def perform_smb_task(srv_status, shop_id: str) -> None:
                 handler = CSVHandler()
                 valid_records = await handler.process_csv(file_path)
 
-                if valid_records:
-                    logger.info('Validation successful.')
-                    # импортируем данные в БД
-                    await update_data(shop_id, valid_records)
-                    
-                else:
-                    logger.warning('Failed to process records.')
-
                 # await run_csv_reader(file_path)
             except Exception as e:
                 logger.error(f'Ошибка при чтении файла магазина {shop_id} в UTF-8: {e}')
+                
+            try:
+                if valid_records:
+                    logger.info('Validation successful.')
+                    # импортируем данные в БД
+                    # pprint([shop_id, valid_records])
+                    await update_data(shop_id, valid_records)
+                
+                else:
+                    logger.warning('Failed to process records.')
+            except Exception as e:
+                logger.error(f'Ошибка при импорте данных в БД для магазина {shop_id}: {e}')
 
     except IndexError as e:
         logger.error(f'Индекс вышел за пределы диапазона при обработке магазина {shop_id}: {e}')

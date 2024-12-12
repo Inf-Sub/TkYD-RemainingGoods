@@ -1,4 +1,4 @@
-create table products
+CREATE TABLE IF NOT EXISTS products
 (
     id            int auto_increment
         primary key,
@@ -10,5 +10,6 @@ create table products
     updated_at    timestamp        default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP,
     constraint nomenclature_number
         unique (barcode)
-);
+)
+    DEFAULT CHARSET=utf8;
 

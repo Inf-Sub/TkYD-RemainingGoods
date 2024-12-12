@@ -1,12 +1,12 @@
 __author__ = 'InfSub'
 __contact__ = 'ADmin@TkYD.ru'
 __copyright__ = 'Copyright (C) 2024, [LegioNTeaM] InfSub'
-__date__ = '2024/11/27'
+__date__ = '2024/12/12'
 __deprecated__ = False
 __email__ = 'ADmin@TkYD.ru'
 __maintainer__ = 'InfSub'
 __status__ = 'Production'
-__version__ = '2.5.3'
+__version__ = '2.6.4'
 
 from os.path import join as os_join
 from csv import DictReader as csv_DictReader
@@ -14,7 +14,7 @@ from aiofiles import open as aio_open
 from chardet import detect as char_detect
 from typing import List, Dict, Any, Optional
 from pathlib import Path
-from re import findall as re_findall, sub as re_sub
+from re import findall as re_findall, sub as re_sub, search as re_search, compile as re_compile, IGNORECASE
 from config import get_csv_config
 
 from logger import logging, setup_logger
@@ -29,15 +29,15 @@ class CSVHandler:
 
     @staticmethod
     async def detect_encoding(file_path: Path, sample_size: int = 1024) -> Optional[str]:
-        # try:
-        async with aio_open(file_path, 'rb') as file:
-            raw_data = await file.read(sample_size)
-            result = char_detect(raw_data)
-            encoding = result['encoding']
-            return encoding.lower() if encoding else None
-        # except Exception as e:
-        #     logger.error(f'Unable to determine encoding of file {file_path.name}: {e}.')
-        #     return None
+        try:
+            async with aio_open(file_path, 'rb') as file:
+                raw_data = await file.read(sample_size)
+                result = char_detect(raw_data)
+                encoding = result['encoding']
+                return encoding.lower() if encoding else None
+        except Exception as e:
+            logger.error(f'Unable to determine encoding of file {file_path.name}: {e}.')
+            return None
 
     async def convert_encoding(
             self, input_file: Path, output_file: Optional[Path] = None, output_encode: str = 'utf-8') -> None:
@@ -103,64 +103,186 @@ class CSVHandler:
             sum_odd = sum(int(barcode_ean13[i]) for i in range(0, 12, 2))
             checksum = (10 - (sum_odd + 3 * sum_even) % 10) % 10
             return checksum == int(barcode_ean13[-1])
-
-        def extract_number_from_string(value: str) -> Optional[float]:
-            matches = re_findall(r'\d+\.?\d*', value)  # Поиск чисел в строке
-            if matches:
-                return float(matches[0])  # Преобразование первого найденного числа в float
+        
+        
+        def get_valid_number(value, max_value, pattern):
+            if isinstance(value, (int, float)) and 0 < value <= max_value:
+                return float(value)
+            elif isinstance(value, str) and value:
+                found_value = re_search(pattern, value)
+                if found_value:
+                    number = float(found_value.group().replace(',', '.'))
+                    if 0 < number <= max_value:
+                        return number
             return None
 
+
+        def extract_number_from_string(value: Optional[str]) -> Optional[float]:
+            if value is None:
+                return None
+            
+            matches = re_findall(r'\d+\.?\d*', value)  # Используем re.findall вместо re_findall
+            if matches:
+                # print(f'matches {matches[0]}')
+                return float(matches[0])  # Преобразование первого найденного числа в float
+            return None
+        
+        def parse_composition(composition_str: str, replacements: Dict[str, str]) -> Optional[float]:
+            
+            # Преобразование строки к нижнему регистру для унификации
+            composition_str = composition_str.lower()
+            
+            # Замена сокращений на полные названия
+            for short_name, full_name in replacements.items():
+                composition_str = composition_str.replace(short_name.lower(), full_name.lower())
+            
+            # Регулярное выражение для поиска составов в формате "XX% материал" или "материал XX%"
+            pattern = r'(\d+(?:[\.,]\d+)?)\s*%?\s*([а-яёa-z]+)|([а-яёa-z]+)\s*(\d+(?:[\.,]\d+)?)\s*%?'
+            
+            # Создание словаря для результата
+            composition_dict = {}
+            
+            # Поиск всех совпадений
+            matches = re_findall(pattern, composition_str)
+            
+            # Обработка всех найденных элементов
+            for match in matches:
+                # Определение правильного порядка числа и названия
+                if match[0]:  # Формат "XX% материал"
+                    percentage, material = match[0], match[1]
+                else:  # Формат "материал XX%"
+                    percentage, material = match[3], match[2]
+                
+                # Приведение имени материала к стандартному виду
+                material = material.capitalize()
+                
+                # Заменяем запятые на точки в числах
+                percentage = percentage.replace(',', '.')
+                
+                # Запись в словарь
+                composition_dict[material] = float(percentage)
+            
+            return composition_dict
+
         valid_data = []
+        
+        key_barcode = 'Packing.Barcode'
+        key_article = 'Артикул'
+        key_unit_name = 'Packing.Name'
+        key_quantity = 'Packing.Колво'
+        key_stock = 'Packing.СвободныйОстаток'
+        key_storage_location = 'Packing.МестоХранения'
+        key_width = 'Packing.Ширина'
+        key_density = 'Packing.Плотность'
+        key_compound = 'Packing.Состав'
+        key_price = 'Packing.Цена'
+        key_new_price = 'Packing.НоваяЦена'
+        key_discount = 'Packing.Скидка'
+        key_promo_period = 'Packing.СрокАкции'
+        key_organization = 'Packing.Организация'
+        key_product_name = 'Наименование'
+        key_code = 'Код'
+        key_description = 'Description'
+        key_additional_description = 'AdditionalDescription'
+        key_factory = 'Packing.Производитель'
+        key_factory_country = 'Packing.СтранаПроизводства'
+        key_factory_address = 'Packing.АдресПроизводителя'
+        
+        max_width = 200  # 200 mm
+        pattern = re_compile(r'\d+(?:[\.,]\d+)?')
+        dict_replacements = {
+            'П/Э': 'Полиэстер', 'П/А': 'Полиамид', 'Металлизированная нить': 'Люрекс', 'альпаки': 'альпака', }
 
         try:
             for row in data:
-                check_key_barcode = 'Packing.Barcode'
-                check_key_stock = 'Packing.СвободныйОстаток'
-                check_key_width = 'Packing.Ширина'
-                check_key_factory_address = 'Packing.АдресПроизводителя'
-                max_width = 200  # 200 mm
-
-                if check_key_barcode in row and isinstance(row[check_key_barcode], str):
-                    barcode = row[check_key_barcode]
+                if key_barcode in row and isinstance(row[key_barcode], str):
+                    barcode = row[key_barcode]
 
                     # Проверка поля 'Packing.Barcode' на валидность значения, также информативная проверка
                     # на корректность EAN-13
                     if len(barcode) == 13 and barcode.isdigit():
                         if self.env['invalid_ean13'] and not is_valid_ean13(barcode):
                             logger.info(f'Invalid EAN-13 barcode: "{barcode}". This is "CODE-128".')
-
-                        # Проверка поля 'Packing.СвободныйОстаток' на наличие числа (не пусто) и не равно NoneType
-                        free_stock = row.get(check_key_stock)
-
-                        # TODO: Проверить корректную работу continue - скорее всего тут нужна перезапись на пустое
-                        #  значение
-                        if free_stock is not None:
-                            try:
-                                float(free_stock)
-                            except ValueError:
-                                logger.warning(f'Invalid numeric value: "{free_stock}" in "{check_key_stock}": {row}')
-                                continue  # Пропускаем этот ряд, так как значение не является числом
-                        else:
-                            logger.warning(f'None value found in "{check_key_stock}": {row}')
-                            continue  # Пропускаем этот ряд, так как значение отсутствует
-
+                        
+                        
+                        # Проверка поля 'Packing.Колво' на наличие числа (не пусто)
+                        free_quantity = row.get(key_quantity)
+                        try:
+                            row[key_quantity] = float(free_quantity)
+                        except (ValueError, TypeError):
+                            logger.warning(f'Invalid or None value: "{free_quantity}" in "{key_quantity}": {row}')
+                            continue  # Пропускаем этот ряд (row), так как значение не является числом или отсутствует
+                        
+                        
+                        # Проверка поля 'Packing.СвободныйОстаток' на наличие числа (не пусто)
+                        free_stock = row.get(key_stock)
+                        try:
+                            row[key_stock] = float(free_stock)
+                        except (ValueError, TypeError):
+                            logger.warning(f'Invalid or None value: "{free_stock}" in "{key_stock}": {row}')
+                            # continue  # Пропускаем этот ряд, так как значение не является числом или отсутствует
+                        
+                        
                         # Проверка поля 'Packing.Ширина' и получение из него цифрового значения <= max_width
-                        width_value = row.get(check_key_width, '')
-                        extracted_number = extract_number_from_string(width_value)
-                        if extracted_number is not None and extracted_number <= max_width:
-                            row[check_key_width] = extracted_number
-                        else:
-                            row[check_key_width] = ''  # Устанавливаем пустое значение, если число не найдено
-
+                        width_value = get_valid_number(row.get(key_width, ''), max_width, pattern)
+                        if width_value is None:
+                            width_value = get_valid_number(row.get(key_description, ''), max_width, pattern)
+                        row[key_width] = width_value
+                        
+                        
                         # Проверка поля 'Packing.АдресПроизводителя' и удаление подстроки 'адрес:'
-                        factory_address_value = row.get(check_key_factory_address, '')
-                        if factory_address_value is not None:
-                            factory_address_value = factory_address_value.replace('адрес:', '')
-                            factory_address_value = re_sub(r'\s+', ' ', factory_address_value).strip()
-                            row[check_key_factory_address] = factory_address_value
+                        factory_address_value = re_sub(r'\s+', ' ', row.get(
+                            key_factory_address, '').replace('адрес:', '').strip())
+                        row[key_factory_address] = factory_address_value if factory_address_value else None
+                        
+                        
+                        # Проверка поля 'Packing.МестоХранения'
+                        storage_location_value = re_sub(r'\s+', ' ', row.get(key_storage_location, '').strip())
+                        row[key_storage_location] = [
+                            value.strip() for value in storage_location_value.split(',')
+                        ] if storage_location_value else None
+                        
+                        
+                        # Проверка поля 'Packing.Name'
+                        units_value = re_sub(r'\s+', ' ', row.get(key_unit_name, '').replace('.', '').strip())
+                        # row[key_unit_name] = units_value if units_value else None
+                        # Костыль:
+                        # если `units_value` не равно `None`, не равно `'м'` и не равно `'шт'`, то
+                        # `row[key_unit_name]` получит значение `'к-т'` (косплект). В противном случае
+                        # `row[key_unit_name]` примет значение `units_value`.
+                        row[key_unit_name] = 'к-т' if (
+                                units_value is not None and units_value != 'м' and units_value != 'шт') else units_value
+                        
+                        
+                        # Проверка поля 'Packing.Состав'
+                        compound_value = re_sub(r'\s+', ' ', row.get(key_compound, '').strip())
+                        if compound_value:
+                            row[key_compound] = parse_composition(compound_value, dict_replacements)
+                            sum_compound_value = sum(row[key_compound].values())
+                            if sum_compound_value != 100:
+                                logger.warning(
+                                    f'Compound: Barcode: {barcode}. Sum: {sum_compound_value}. '
+                                    f'Original: {compound_value}. After parse: {row[key_compound]}')
                         else:
-                            row[check_key_factory_address] = ''  # Устанавливаем пустое значение, если значение == None
+                            row[key_compound] = None
+                            
+                        # temp del (not use)
+                        del row[key_product_name]  # ?
+                        
+                        del row[key_factory]
+                        del row[key_factory_country]
+                        del row[key_factory_address]
+                        
+                        del row[key_new_price]
+                        del row[key_promo_period]
+                        del row[key_discount]
+                        del row[key_organization]
 
+                        # unnecessary variables
+                        del row[key_code]
+                        del row[key_description]
+                        del row[key_additional_description]
+                        
                         valid_data.append(row)
                     else:
                         logger.warning(f'Invalid barcode: "{barcode}": {row}')
@@ -170,6 +292,7 @@ class CSVHandler:
             logger.error(f'Error validating data: {e}')
             raise
 
+        print(f'valid_data: {valid_data}')
         return valid_data
 
     # # version 2.5.1
@@ -255,21 +378,36 @@ class CSVHandler:
 if __name__ == '__main__':
     from asyncio import run as async_run
     from config import get_smb_config
-    from random import randint
+    from random import randrange
 
     smb_config = get_smb_config()
 
     handler = CSVHandler()
-    csv_file_path = os_join(smb_config['to_path'], 'TOM-01.csv')  # Замените на ваш путь
+    csv_file_path = os_join(smb_config['to_path'], 'OMS-01.csv')  # Замените на ваш путь
+    print(f'Read file: {csv_file_path}')
     valid_records = async_run(handler.process_csv(csv_file_path))
 
     if valid_records:
         max_num = len(valid_records)
         print(f'Валидация прошла успешно, обработано записей: {max_num}')
-        num = randint(0, max_num)
-        print(f'Запись #{num}:')
-        print(f'{valid_records[num]}')
-        # for record in valid_records:
-        #     print(record)
+        for num in range(max_num):
+            if valid_records[num]['Packing.Barcode'] == '2103203216754':
+                print(f'{valid_records[num]}')
+                break
+        # while True:
+        #     num = randrange(0, max_num)
+        #     print(f'{num} < {max_num}')
+        #     place = valid_records[num]['Packing.МестоХранения']
+        #     compound = valid_records[num]['Packing.Состав']
+        #
+        #     if (place is not None and len(place) > 1) or (compound is not None and len(compound) > 1):
+        #         print(f'Ширина: {valid_records[num]['Packing.Ширина']}')
+        #         print(f'МестоХранения: {place}')
+        #         print(f'МестоХранения: {compound}')
+        #         print(f'Запись #{num}:')
+        #         print(f'{valid_records[num]}')
+        #         # for record in valid_records:
+        #         #     print(record)
+        #         break
     else:
         print('Не удалось обработать записи.')

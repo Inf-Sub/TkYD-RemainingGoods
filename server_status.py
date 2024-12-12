@@ -1,20 +1,18 @@
 __author__ = 'InfSub'
 __contact__ = 'ADmin@TkYD.ru'
 __copyright__ = 'Copyright (C) 2024, [LegioNTeaM] InfSub'
-__date__ = '2024/11/13'
+__date__ = '2024/12/11'
 __deprecated__ = False
 __email__ = 'ADmin@TkYD.ru'
 __maintainer__ = 'InfSub'
 __status__ = 'Production'
-__version__ = '2.2.8'
+__version__ = '2.2.9'
 
 
 # from aiofiles import open as aio_open
 # from os.path import exists
 from config import get_status_config
-
 from logger import logging, setup_logger
-
 
 setup_logger()
 logger = logging.getLogger(__name__)
@@ -26,6 +24,13 @@ class AsyncKeyValueStore:
         self.env = get_status_config()
 
     async def set_value(self, key: str, value: str):
+        """
+        Асинхронно устанавливает значение для указанного ключа.
+        Если ключ уже существует, обновляет его значение, иначе добавляет новый ключ.
+
+        :param key: str,  # Ключ для хранения.
+        :param value: str,  # Значение, связанное с ключом.
+        """
         if key in self.store:
             logger.info(f'Updating value for key: {key} to {value}')
         else:
@@ -34,10 +39,19 @@ class AsyncKeyValueStore:
         self.store[key] = value
 
     async def get_store(self):
+        """
+        Асинхронно возвращает текущее состояние хранилища в виде словаря.
+
+        :return: dict,  # Словарь текущих состояний хранилища.
+        """
         logger.info('Returning current store')
         return self.store
 
     async def save_to_file(self):
+        """
+        Асинхронно сохраняет текущее состояние хранилища в файл, путь к которому
+        указывается в конфигурации окружения. Если путь не установлен, записывается ошибка в лог.
+        """
         file_path = self.env['path']
         if not file_path:
             logger.error('"STATUS_FILE_PATH" is not set in .env file')
@@ -52,6 +66,10 @@ class AsyncKeyValueStore:
 
 # Пример использования
 async def main_test():
+    """
+    Пример асинхронного использования класса AsyncKeyValueStore.
+    Создает экземпляр хранилища, добавляет и обновляет значения, получает текущее состояние и сохраняет его в файл.
+    """
     kv_store = AsyncKeyValueStore()
     await kv_store.set_value('key1', 'value1')
     await kv_store.set_value('key2', 'value2')

@@ -1,118 +1,101 @@
 [
   {
-    "id": 1,
     "internal_number": 70,
     "warehouse_short_name": "MSK-WH70",
     "warehouse_name": "Склад хранения",
     "currency_id": 1
   },
   {
-    "id": 2,
     "internal_number": 71,
     "warehouse_short_name": "MSK-LT",
     "warehouse_name": "ЛегаТессиле (Варшавка)",
     "currency_id": 1
   },
   {
-    "id": 3,
     "internal_number": 35,
     "warehouse_short_name": "MSK-IT",
     "warehouse_name": "Кутюр",
     "currency_id": 1
   },
   {
-    "id": 4,
     "internal_number": 37,
     "warehouse_short_name": "MSK-TL",
     "warehouse_name": "Текстиль Люкс (Огородный)",
     "currency_id": 1
   },
   {
-    "id": 5,
     "internal_number": 2,
     "warehouse_short_name": "BRN-01",
     "warehouse_name": "Барнаул",
     "currency_id": 2
   },
   {
-    "id": 6,
     "internal_number": 3,
     "warehouse_short_name": "VLD-01",
     "warehouse_name": "Владивосток",
     "currency_id": 2
   },
   {
-    "id": 7,
     "internal_number": 4,
     "warehouse_short_name": "VGG-01",
     "warehouse_name": "Волгоград",
     "currency_id": 2
   },
   {
-    "id": 8,
     "internal_number": 5,
     "warehouse_short_name": "VRN-01",
     "warehouse_name": "Воронеж",
     "currency_id": 2
   },
   {
-    "id": 9,
     "internal_number": 6,
     "warehouse_short_name": "EKB-01",
     "warehouse_name": "Екатеринбург",
     "currency_id": 2
   },
   {
-    "id": 10,
     "internal_number": 7,
     "warehouse_short_name": "IRK-01",
     "warehouse_name": "Иркутск",
     "currency_id": 2
   },
   {
-    "id": 11,
     "internal_number": 8,
     "warehouse_short_name": "KZN-01",
     "warehouse_name": "Казань (Основной)",
     "currency_id": 2
   },
   {
-    "id": 12,
     "internal_number": 40,
     "warehouse_short_name": "KZN-02",
     "warehouse_name": "Казань (Дисконт)",
     "currency_id": 2
   },
   {
-    "id": 13,
     "internal_number": 9,
     "warehouse_short_name": "KRY-01",
     "warehouse_name": "Красноярск",
     "currency_id": 2
   },
   {
-    "id": 14,
     "internal_number": 10,
     "warehouse_short_name": "KRD-01",
     "warehouse_name": "Краснодар",
     "currency_id": 2
   },
   {
-    "id": 15,
     "internal_number": 11,
     "warehouse_short_name": "RND-01",
     "warehouse_name": "Ростов-на-Дону",
     "currency_id": 2
   },
   {
-    "id": 16,
     "internal_number": 12,
     "warehouse_short_name": "NNV-01",
     "warehouse_name": "Нижний Новгород",
     "currency_id": 2
   },
   {
-    "id": 17,
     "internal_number": 13,
     "warehouse_short_name": "NKZ-01",
     "warehouse_name": "Новокузнецк",
@@ -126,133 +109,114 @@
     "currency_id": 2
   },
   {
-    "id": 19,
     "internal_number": 15,
     "warehouse_short_name": "SAM-01",
     "warehouse_name": "Самара",
     "currency_id": 2
   },
   {
-    "id": 20,
     "internal_number": 16,
     "warehouse_short_name": "TYM-01",
     "warehouse_name": "Тюмень",
     "currency_id": 2
   },
   {
-    "id": 21,
     "internal_number": 17,
     "warehouse_short_name": "CHL-01",
     "warehouse_name": "Челябинск",
     "currency_id": 2
   },
   {
-    "id": 22,
     "internal_number": 19,
     "warehouse_short_name": "TOM-01",
     "warehouse_name": "Томск",
     "currency_id": 2
   },
   {
-    "id": 23,
     "internal_number": 20,
     "warehouse_short_name": "SAR-01",
     "warehouse_name": "Саратов",
     "currency_id": 2
   },
   {
-    "id": 24,
     "internal_number": 21,
     "warehouse_short_name": "IZH-01",
     "warehouse_name": "Ижевск",
     "currency_id": 2
   },
   {
-    "id": 25,
     "internal_number": 22,
     "warehouse_short_name": "PNZ-01",
     "warehouse_name": "Пенза",
     "currency_id": 2
   },
   {
-    "id": 26,
     "internal_number": 23,
     "warehouse_short_name": "PRM-01",
     "warehouse_name": "Пермь",
     "currency_id": 2
   },
   {
-    "id": 27,
     "internal_number": 24,
     "warehouse_short_name": "UFA-01",
     "warehouse_name": "Уфа",
     "currency_id": 2
   },
   {
-    "id": 28,
     "internal_number": 25,
     "warehouse_short_name": "KHB-01",
     "warehouse_name": "Хабаровск",
     "currency_id": 2
   },
   {
-    "id": 29,
     "internal_number": 26,
     "warehouse_short_name": "UUD-01",
     "warehouse_name": "Улан-Удэ",
     "currency_id": 2
   },
   {
-    "id": 30,
     "internal_number": 27,
     "warehouse_short_name": "KEM-01",
     "warehouse_name": "Кемерово",
     "currency_id": 2
   },
   {
-    "id": 31,
     "internal_number": 28,
     "warehouse_short_name": "MSK-01",
     "warehouse_name": "Москва-1",
     "currency_id": 2
   },
   {
-    "id": 32,
     "internal_number": 53,
     "warehouse_short_name": "MSK-02",
     "warehouse_name": "Москва-2",
     "currency_id": 2
   },
   {
-    "id": 33,
     "internal_number": 54,
     "warehouse_short_name": "MSk-03",
     "warehouse_name": "Москва-3",
     "currency_id": 2
   },
   {
-    "id": 34,
     "internal_number": 29,
     "warehouse_short_name": "SPB-01",
     "warehouse_name": "Санкт-Питербург-1",
     "currency_id": 2
   },
   {
-    "id": 35,
     "internal_number": 51,
     "warehouse_short_name": "SPB-02",
     "warehouse_name": "Санкт-Питербург-2",
     "currency_id": 2
   },
   {
-    "id": 36,
     "internal_number": 30,
     "warehouse_short_name": "NSK-01",
     "warehouse_name": "Новосибирск-1",
     "currency_id": 2
   },
   {
-    "id": 37,
     "internal_number": 50,
     "warehouse_short_name": "NSK-02",
     "warehouse_name": "Новосибирск-2",

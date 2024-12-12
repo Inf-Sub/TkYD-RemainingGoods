@@ -1,4 +1,4 @@
-create table storage_location_comments
+CREATE TABLE IF NOT EXISTS storage_location_comments
 (
     location_id    int       not null,
     description_id mediumint not null,
@@ -9,5 +9,6 @@ create table storage_location_comments
     constraint FK_storage_location_comments_storage_location_names
         foreign key (location_id) references storage_location_names (id)
             on update cascade
-);
+)
+    DEFAULT CHARSET=utf8;
 

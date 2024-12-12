@@ -1,4 +1,4 @@
-create table product_photos
+CREATE TABLE IF NOT EXISTS product_photos
 (
     id          int auto_increment
         primary key,
@@ -10,5 +10,6 @@ create table product_photos
     constraint FK_product_photos_products
         foreign key (product_id) references products (id)
             on delete cascade
-);
+)
+    DEFAULT CHARSET=utf8;
 
