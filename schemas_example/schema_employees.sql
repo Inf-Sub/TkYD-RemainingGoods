@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS employees (
+	id INT(4) NOT NULL AUTO_INCREMENT,
+	app_user_id BIGINT(12) UNSIGNED ZEROFILL NOT NULL,
+	app_user_login VARCHAR(20) NULL DEFAULT NULL,
+	store_id CHAR(6) NOT NULL,
+	last_name VARCHAR(20) NULL DEFAULT NULL,
+	first_name VARCHAR(20) NULL DEFAULT NULL,
+	middle_name VARCHAR(20) NULL DEFAULT NULL,
+	birthday DATE NULL DEFAULT NULL,
+	position ENUM('Director','Top manager','Manager','Cashier','Storekeeper') NULL DEFAULT 'Manager',
+	status ENUM('working','fired') NOT NULL DEFAULT 'working',
+	hired DATE NULL DEFAULT NULL COMMENT 'Дата принятия на работу',
+	dismissal_date DATE NULL DEFAULT NULL COMMENT 'Дата увольнения',
+	passport_series SMALLINT(4) NULL DEFAULT NULL COMMENT 'Серия паспорта',
+	passport_number MEDIUMINT(6) NULL DEFAULT NULL COMMENT 'Номер паспорта',
+	TIN MEDIUMINT(6) NULL DEFAULT NULL COMMENT 'ИНН',
+	created_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	update_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+	PRIMARY KEY (id),
+	UNIQUE INDEX app_user_id (app_user_id),
+	INDEX FK_employees_stores (store_id),
+	CONSTRAINT FK_employees_stores FOREIGN KEY (store_id) REFERENCES stores (identity) ON UPDATE CASCADE ON DELETE RESTRICT
+) COMMENT='Сотрудники';

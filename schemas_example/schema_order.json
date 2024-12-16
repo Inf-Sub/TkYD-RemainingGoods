@@ -1,0 +1,12 @@
+{
+   "order": [
+       "schema_cities.sql",
+       "schema_stores.sql",
+       "schema_store_hours.sql",
+       "schema_employees.sql"
+   ],
+    "data": {
+        "cities": "datas_cities.json",
+        "stores": "datas_stores.json"
+    }
+}
