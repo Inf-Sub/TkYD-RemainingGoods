@@ -1,12 +1,12 @@
 __author__ = 'InfSub'
 __contact__ = 'ADmin@TkYD.ru'
 __copyright__ = 'Copyright (C) 2024, [LegioNTeaM] InfSub'
-__date__ = '2024/12/12'
+__date__ = '2024/12/17'
 __deprecated__ = False
 __email__ = 'ADmin@TkYD.ru'
 __maintainer__ = 'InfSub'
 __status__ = 'Production'
-__version__ = '2.6.4'
+__version__ = '2.6.6'
 
 from os.path import join as os_join
 from csv import DictReader as csv_DictReader
@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 class CSVHandler:
     def __init__(self):
+        self.data_name = None
         self.env = get_csv_config()
 
     @staticmethod
@@ -94,7 +95,7 @@ class CSVHandler:
             raise
         return data
 
-    # version 2.5.4
+    # version 2.5.5
     def validate_data(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         def is_valid_ean13(barcode_ean13: str) -> bool:
             if len(barcode_ean13) != 13 or not barcode_ean13.isdigit():
@@ -117,15 +118,16 @@ class CSVHandler:
             return None
 
 
-        def extract_number_from_string(value: Optional[str]) -> Optional[float]:
-            if value is None:
-                return None
-            
-            matches = re_findall(r'\d+\.?\d*', value)  # Используем re.findall вместо re_findall
-            if matches:
-                # print(f'matches {matches[0]}')
-                return float(matches[0])  # Преобразование первого найденного числа в float
-            return None
+        # def extract_number_from_string(value: Optional[str]) -> Optional[float]:
+        #     if value is None:
+        #         return None
+        #
+        #     matches = re_findall(r'\d+\.?\d*', value)  # Используем re.findall вместо re_findall
+        #     if matches:
+        #         # print(f'matches {matches[0]}')
+        #         return float(matches[0])  # Преобразование первого найденного числа в float
+        #     return None
+        
         
         def parse_composition(composition_str: str, replacements: Dict[str, str]) -> Optional[float]:
             
@@ -187,9 +189,8 @@ class CSVHandler:
         key_factory = 'Packing.Производитель'
         key_factory_country = 'Packing.СтранаПроизводства'
         key_factory_address = 'Packing.АдресПроизводителя'
-        
-        max_width = 200  # 200 mm
-        pattern = re_compile(r'\d+(?:[\.,]\d+)?')
+
+        pattern_float = re_compile(r'\d+(?:[\.,]\d+)?')
         dict_replacements = {
             'П/Э': 'Полиэстер', 'П/А': 'Полиамид', 'Металлизированная нить': 'Люрекс', 'альпаки': 'альпака', }
 
@@ -210,7 +211,9 @@ class CSVHandler:
                         try:
                             row[key_quantity] = float(free_quantity)
                         except (ValueError, TypeError):
-                            logger.warning(f'Invalid or None value: "{free_quantity}" in "{key_quantity}": {row}')
+                            logger.warning(
+                                f'Shop: {self.data_name}. '
+                                f'Invalid or None value: "{free_quantity}" in "{key_quantity}": {row}')
                             continue  # Пропускаем этот ряд (row), так как значение не является числом или отсутствует
                         
                         
@@ -219,14 +222,17 @@ class CSVHandler:
                         try:
                             row[key_stock] = float(free_stock)
                         except (ValueError, TypeError):
-                            logger.warning(f'Invalid or None value: "{free_stock}" in "{key_stock}": {row}')
+                            logger.warning(
+                                f'Shop: {self.data_name}. '
+                                f'Invalid or None value: "{free_stock}" in "{key_stock}": {row}')
                             # continue  # Пропускаем этот ряд, так как значение не является числом или отсутствует
                         
                         
-                        # Проверка поля 'Packing.Ширина' и получение из него цифрового значения <= max_width
-                        width_value = get_valid_number(row.get(key_width, ''), max_width, pattern)
+                        # Проверка поля 'Packing.Ширина' и получение из него цифрового значения <= self.env['max_width']
+                        width_value = get_valid_number(row.get(key_width, ''), self.env['max_width'], pattern_float)
                         if width_value is None:
-                            width_value = get_valid_number(row.get(key_description, ''), max_width, pattern)
+                            width_value = get_valid_number(
+                                row.get(key_description, ''), self.env['max_width'], pattern_float)
                         row[key_width] = width_value
                         
                         
@@ -261,13 +267,14 @@ class CSVHandler:
                             sum_compound_value = sum(row[key_compound].values())
                             if sum_compound_value != 100:
                                 logger.warning(
-                                    f'Compound: Barcode: {barcode}. Sum: {sum_compound_value}. '
+                                    f'Shop: {self.data_name}. Compound: Barcode: {barcode}. Sum: {sum_compound_value}. '
                                     f'Original: {compound_value}. After parse: {row[key_compound]}')
+                                row[key_compound] = None
                         else:
                             row[key_compound] = None
                             
                         # temp del (not use)
-                        del row[key_product_name]  # ?
+                        # del row[key_product_name]  # ?
                         
                         del row[key_factory]
                         del row[key_factory_country]
@@ -289,10 +296,10 @@ class CSVHandler:
                 else:
                     logger.warning(f'Missing or invalid barcode key in data: {row}')
         except Exception as e:
-            logger.error(f'Error validating data: {e}')
+            logger.error(f'Shop: {self.data_name}. Error validating data: {e}')
             raise
 
-        print(f'valid_data: {valid_data}')
+        # print(f'Valid_data: {valid_data}')
         return valid_data
 
     # # version 2.5.1
@@ -366,6 +373,8 @@ class CSVHandler:
     async def process_csv(self, file_path: str) -> List[Dict[str, Any]]:
         try:
             input_path = Path(file_path)
+            self.data_name = input_path.name
+            
             await self.convert_encoding(input_path)
             data = self.read_csv(input_path, delimiter=self.env['csv_delimiter'])
             valid_data = self.validate_data(data)

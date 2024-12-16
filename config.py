@@ -1,12 +1,12 @@
 __author__ = 'InfSub'
 __contact__ = 'ADmin@TkYD.ru'
 __copyright__ = 'Copyright (C) 2024, [LegioNTeaM] InfSub'
-__date__ = '2024/11/28'
+__date__ = '2024/12/17'
 __deprecated__ = False
 __email__ = 'ADmin@TkYD.ru'
 __maintainer__ = 'InfSub'
 __status__ = 'Production'
-__version__ = '2.5.2'
+__version__ = '2.6.6'
 
 from os import getenv
 from os.path import join
@@ -49,7 +49,8 @@ def load_env() -> dict:
 
         'CSV_DELIMITER': getenv('CSV_DELIMITER'),
 
-        'INVALID_EAN13': getenv('INVALID_EAN13', False).lower() in ('true', '1', 't', 'y', 'yes'),
+        'CSV_DATA_INVALID_EAN13': getenv('CSV_DATA_INVALID_EAN13', False).lower() in ('true', '1', 't', 'y', 'yes'),
+        'CSV_DATA_MAX_WIDTH': getenv('CSV_DATA_MAX_WIDTH', 200),
 
         'LOG_DIR': getenv('LOG_DIR'),
         'LOG_FILE': getenv('LOG_FILE'),
@@ -111,7 +112,8 @@ def get_csv_config() -> dict:
     env = load_env()
     return {
         'csv_delimiter': env['CSV_DELIMITER'],
-        'invalid_ean13': bool(env['INVALID_EAN13']),
+        'invalid_ean13': bool(env['CSV_DATA_INVALID_EAN13']),
+        'max_width': int(env['CSV_DATA_MAX_WIDTH']),
 
     }
 
