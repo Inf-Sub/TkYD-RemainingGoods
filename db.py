@@ -402,18 +402,18 @@ async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
                 
                 location_name_ids = []  # Список идентификаторов мест хранения
                 if key_storage in data and data[key_storage]:
-                    print(f'Shop: {wh_short_name}, {key_storage}, {data[key_storage]}')
+                    # print(f'Shop: {wh_short_name}, {key_storage}, {data[key_storage]}')
                     table = 'storage_location_names'
                     for location_name in data[key_storage]:
-                        print(f'Shop: {wh_short_name}, {key_storage}, {location_name}')
+                        # print(f'Shop: {wh_short_name}, {key_storage}, {location_name}')
                         conditions = {'name': location_name}
                         await db_manager.upsert_or_insert_data(cur, table, conditions)
                         
                         location_name_id = cur.lastrowid or (
                             await db_manager.fetch_with_dict_cursor(table, conditions))[0]['id']
-                        print(f'Shop: {wh_short_name}, location_name_id: {location_name_id}')
+                        # print(f'Shop: {wh_short_name}, location_name_id: {location_name_id}')
                         location_name_ids.append(location_name_id)
-                        print(f'Shop: {wh_short_name}, location_name_ids: {location_name_ids}')
+                        # print(f'Shop: {wh_short_name}, location_name_ids: {location_name_ids}')
                 else:
                     if log_warn_view:
                         logger.warning(
@@ -426,7 +426,7 @@ async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
                 # Добавляем условие для ширины только если значение не None или тип количества не равен метрам
                 if data[key_width] is not None or (data[key_name] is not None and data[key_name].lower() != 'м'):
                     conditions['product_width'] = data[key_width]
-                    print(f'Shop: {wh_short_name}, added "{key_width}" to {conditions}')
+                    # print(f'Shop: {wh_short_name}, added "{key_width}" to {conditions}')
                 
                 await db_manager.upsert_or_insert_data(cur, table, conditions)
                 
@@ -450,13 +450,13 @@ async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
 
                 # Обработка и импорт данных о составе
                 if key_material in data and data[key_material]:
-                    print(f'Shop: {wh_short_name}, key_material: {key_material}, {data[key_material]}')
+                    # print(f'Shop: {wh_short_name}, key_material: {key_material}, {data[key_material]}')
                     for material_name, proportion in data[key_material].items():
-                        print(f'Shop: {wh_short_name}, key_material: {key_material}, material_name: {material_name},'
-                              f' {proportion}')
+                        # print(f'Shop: {wh_short_name}, key_material: {key_material}, material_name: {material_name},'
+                        #       f' {proportion}')
                         if material_name in materials_dict:
                             material_id = materials_dict[material_name]
-                            print(f'Shop: {wh_short_name}, material_name: {material_name}, material_id: {material_id}')
+                            # print(f'Shop: {wh_short_name}, material_name: {material_name}, material_id: {material_id}')
                             table = 'product_materials'
                             conditions = {
                                 'product_id': product_id, 'material_id': material_id, 'proportion': proportion}
