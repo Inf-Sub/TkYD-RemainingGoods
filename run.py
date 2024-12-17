@@ -1,12 +1,12 @@
 __author__ = 'InfSub'
 __contact__ = 'ADmin@TkYD.ru'
 __copyright__ = 'Copyright (C) 2024, [LegioNTeaM] InfSub'
-__date__ = '2024/12/11'
+__date__ = '2024/12/17'
 __deprecated__ = False
 __email__ = 'ADmin@TkYD.ru'
 __maintainer__ = 'InfSub'
 __status__ = 'Development'  # 'Production / Development'
-__version__ = '2.6.1'
+__version__ = '2.7.0'
 
 from asyncio import run as aio_run, sleep as aio_sleep, create_task as aio_create_task, gather as aio_gather
 # from asyncio import get_event_loop as aio_get_event_loop
@@ -18,7 +18,8 @@ from pathlib import Path
 from logger import logging, setup_logger
 from config import get_smb_config, get_schedule_config
 from smb_handler import run as smb_run
-from csv_handler import CSVHandler
+# from csv_handler import CSVHandler
+from csv_handler import EnhancedCSVHandler
 from db import update_data
 # from convert_charset import convert_encoding
 from server_status import AsyncKeyValueStore
@@ -67,7 +68,8 @@ async def perform_smb_task(srv_status, shop_id: str) -> None:
             #     logger.error(f'Ошибка при конвертации файла магазина {shop_id} в UTF-8: {e}')
 
             try:
-                handler = CSVHandler()
+                # handler = CSVHandler()
+                handler = EnhancedCSVHandler()
                 valid_records = await handler.process_csv(file_path)
 
                 # await run_csv_reader(file_path)
