@@ -4,8 +4,8 @@ CREATE TABLE IF NOT EXISTS storage_product
         primary key,
     product_id   int                                              not null,
     warehouse_id smallint(3)                                      not null,
-    price        decimal(7, 2)                                    not null comment 'Цена товара на складе',
-    quantity     decimal(7, 3) unsigned default 0.000             not null comment 'Количество на складе',
+    price        decimal(8, 2)                                    not null comment 'Цена товара на складе',
+    quantity     decimal(8, 2) unsigned default 0.000             not null comment 'Количество на складе',
     created_at   timestamp              default CURRENT_TIMESTAMP not null,
     updated_at   timestamp              default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP,
     constraint product_id_warehouse_id

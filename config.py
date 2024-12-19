@@ -1,12 +1,12 @@
 __author__ = 'InfSub'
 __contact__ = 'ADmin@TkYD.ru'
 __copyright__ = 'Copyright (C) 2024, [LegioNTeaM] InfSub'
-__date__ = '2024/12/17'
+__date__ = '2024/12/18'
 __deprecated__ = False
 __email__ = 'ADmin@TkYD.ru'
 __maintainer__ = 'InfSub'
 __status__ = 'Production'
-__version__ = '2.6.6'
+__version__ = '2.7.5'
 
 from os import getenv
 from os.path import join
@@ -42,7 +42,8 @@ def load_env() -> dict:
         'SMB_HOSTNAME_TEMPLATE': getenv('SMB_HOSTNAME_TEMPLATE'),
         'SMB_SHARE': getenv('SMB_SHARE'),
         'SMB_PATH': getenv('SMB_PATH'),
-        'SMB_MULTIPLE': bool(getenv('SMB_MULTIPLE')),
+        'SMB_MULTIPLE': bool(getenv('SMB_MULTIPLE',False).lower() in ('true', '1', 't', 'y', 'yes')),
+        'SMB_DEBUG_MODE': bool(getenv('SMB_DEBUG_MODE', False).lower() in ('true', '1', 't', 'y', 'yes')),
 
         'SMB_LOAD_TO_PATH': getenv('SMB_LOAD_TO_PATH'),
         'SMB_LOAD_FILE_PATTERN': getenv('SMB_LOAD_FILE_PATTERN'),
@@ -100,7 +101,8 @@ def get_smb_config() -> dict:
         'smb_path': env['SMB_PATH'],
         'to_path': env['SMB_LOAD_TO_PATH'],
         'file_pattern': env['SMB_LOAD_FILE_PATTERN'],
-        'multiple': bool(getenv('SMB_MULTIPLE')),
+        'multiple': env['SMB_MULTIPLE'],
+        'debug_mode': env['SMB_DEBUG_MODE'],
 
     }
 
@@ -114,6 +116,7 @@ def get_csv_config() -> dict:
         'csv_delimiter': env['CSV_DELIMITER'],
         'invalid_ean13': bool(env['CSV_DATA_INVALID_EAN13']),
         'max_width': int(env['CSV_DATA_MAX_WIDTH']),
+        'log_dir': env['LOG_DIR']
 
     }
 

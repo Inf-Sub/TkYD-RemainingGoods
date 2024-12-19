@@ -68,8 +68,7 @@ async def create_network_path_async(server: str, share: str, path: str = '') -> 
     return network_path
 
 
-async def copy_files(
-        server: str, network_path: str, file_pattern: str, download_path: str, download_file_name: str
+async def copy_files(server: str, network_path: str, file_pattern: str, download_path: str, download_file_name: str
 ) -> Union[str, bool]:
     """
     :param server: str  # Имя/hostname SMB сервера
@@ -116,7 +115,10 @@ async def copy_files(
                                 logger.error(f'{server}: Exhausted {max_retries} retries for file: {src_file_path}')
                                 return False
                             else:
-                                await aio_sleep(1)  # Задержка перед повторной попыткой
+                                # Задержка перед повторной попыткой с увеличением времени между попытками
+                                wait_time = 2 ** attempt
+                                logger.warning(f'{server}: Waiting {wait_time} seconds for file: {src_file_path}')
+                                await aio_sleep(wait_time)
 
                         except Exception as e:
                             logger.error(f'{server}: An unexpected error occurred: {e}')

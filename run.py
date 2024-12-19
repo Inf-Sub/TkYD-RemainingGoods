@@ -1,12 +1,12 @@
 __author__ = 'InfSub'
 __contact__ = 'ADmin@TkYD.ru'
 __copyright__ = 'Copyright (C) 2024, [LegioNTeaM] InfSub'
-__date__ = '2024/12/17'
+__date__ = '2024/12/18'
 __deprecated__ = False
 __email__ = 'ADmin@TkYD.ru'
 __maintainer__ = 'InfSub'
 __status__ = 'Development'  # 'Production / Development'
-__version__ = '2.7.0'
+__version__ = '2.7.5'
 
 from asyncio import run as aio_run, sleep as aio_sleep, create_task as aio_create_task, gather as aio_gather
 # from asyncio import get_event_loop as aio_get_event_loop
@@ -19,10 +19,11 @@ from logger import logging, setup_logger
 from config import get_smb_config, get_schedule_config
 from smb_handler import run as smb_run
 # from csv_handler import CSVHandler
-from csv_handler import EnhancedCSVHandler
+from csv_validator import CSVValidator
 from db import update_data
 # from convert_charset import convert_encoding
 from server_status import AsyncKeyValueStore
+# import inspect
 
 setup_logger()
 logger = logging.getLogger(__name__)
@@ -37,6 +38,7 @@ async def perform_smb_task(srv_status, shop_id: str) -> None:
     """Выполняет задачу получения файла по SMB и его обработки."""
     start_connect_time = time()
     env = get_smb_config()
+    debug_mode = env['debug_mode']
     hostname = env['host_template'].format(shop_id)
     # Формирование полного пути к файлу для сохранения
     # download_path = os_join(env['to_path'], shop_id + Path(env['file_pattern']).suffix)
@@ -69,14 +71,29 @@ async def perform_smb_task(srv_status, shop_id: str) -> None:
 
             try:
                 # handler = CSVHandler()
-                handler = EnhancedCSVHandler()
+                handler = CSVValidator()
                 valid_records = await handler.process_csv(file_path)
 
                 # await run_csv_reader(file_path)
             except Exception as e:
-                logger.error(f'Ошибка при чтении файла магазина {shop_id} в UTF-8: {e}')
+                if not debug_mode:
+                    # Получаем текущее имя функции и номер строки
+                    # current_frame = inspect.currentframe()
+                    # Получаем исходный код текущей и предыдущей инструкций
+                    # try:
+                    #     function_name = inspect.getframeinfo(current_frame.f_back).function
+                    #     line_number = inspect.getframeinfo(current_frame.f_back).lineno
+                    # finally:
+                    #     # Удаляем ссылку на фрейм, чтобы избежать утечек памяти
+                    #     del current_frame
+                    # logger.error(
+                    #     f'Ошибка в функции {function_name} на строке {line_number} при чтении файла {shop_id} в UTF-8: {e}')
+                    logger.error(f'Ошибка при чтении файла магазина {shop_id} в UTF-8: {e}')
+                else:
+                    raise
                 
             try:
+                # print(f'type: {type(valid_records)}')
                 if valid_records:
                     logger.info('Validation successful.')
                     # импортируем данные в БД
@@ -86,12 +103,26 @@ async def perform_smb_task(srv_status, shop_id: str) -> None:
                 else:
                     logger.warning('Failed to process records.')
             except Exception as e:
-                logger.error(f'Ошибка при импорте данных в БД для магазина {shop_id}: {e}')
-
+                if not debug_mode:
+                    # current_frame = inspect.currentframe()
+                    # try:
+                    #     function_name = inspect.getframeinfo(current_frame.f_back).function
+                    #     line_number = inspect.getframeinfo(current_frame.f_back).lineno
+                    # finally:
+                    #     del current_frame
+                    # logger.error(
+                    #     f'Ошибка в функции {function_name} на строке {line_number} при импорте данных в БД {shop_id}: {e}')
+                    logger.error(f'Ошибка при импорте данных в БД для магазина {shop_id}: {e}')
+                else:
+                    raise
+                
     except IndexError as e:
         logger.error(f'Индекс вышел за пределы диапазона при обработке магазина {shop_id}: {e}')
     except Exception as e:
-        logger.error(f'Ошибка при обработке магазина {shop_id}: {e}')
+        if not debug_mode:
+            logger.error(f'Ошибка при обработке магазина {shop_id}: {e}')
+        else:
+            raise
     finally:
         # Обновление статуса сервера
         # await update_server_status(hostname, bool(file_path))
@@ -127,4 +158,7 @@ async def run():
 
 
 if __name__ == '__main__':
-    aio_run(run())
+    try:
+        aio_run(run())
+    except KeyboardInterrupt:
+        logger.warning(f'Программа была остановлена пользователем.')

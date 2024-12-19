@@ -1,12 +1,12 @@
 __author__ = 'InfSub'
 __contact__ = 'ADmin@TkYD.ru'
 __copyright__ = 'Copyright (C) 2024, [LegioNTeaM] InfSub'
-__date__ = '2024/12/17'
+__date__ = '2024/12/18'
 __deprecated__ = False
 __email__ = 'ADmin@TkYD.ru'
 __maintainer__ = 'InfSub'
 __status__ = 'Production'
-__version__ = '2.7.0'
+__version__ = '2.7.4'
 
 from os.path import join as os_join
 from csv import DictReader as csv_DictReader
@@ -14,7 +14,6 @@ from aiofiles import open as aio_open
 from chardet import detect as char_detect
 from typing import List, Dict, Any, Optional
 from pathlib import Path
-from re import findall as re_findall, sub as re_sub, search as re_search, compile as re_compile, IGNORECASE
 from config import get_csv_config
 
 from logger import logging, setup_logger
@@ -367,213 +366,18 @@ class CSVHandler:
     async def process_csv(self, file_path: str) -> List[Dict[str, Any]]:
         try:
             input_path = Path(file_path)
-            self.data_name = input_path.name
+            self.data_name = input_path.stem
             
             await self.convert_encoding(input_path)
             data = self.read_csv(input_path, delimiter=self.env['csv_delimiter'])
             # valid_data = self.validate_data(data)
-            valid_data = data
-            return valid_data
+            # return valid_data
+            return data
         except Exception as e:
             logger.error(f'Error processing CSV file {file_path}: {e}')
             return []
         
         
-class EnhancedCSVHandler(CSVHandler):
-    def __init__(self):
-        super().__init__()
-    
-    async def process_csv(self, file_path: str) -> List[Dict[str, Any]]:
-        # Вызов базового метода для выполнения основной обработки файла
-        data = await super().process_csv(file_path)
-        
-        # Дополнительная валидация, специфичная для EnhancedCSVHandler
-        validated_data = self.validate_data(data)
-        
-        return validated_data
-
-    @staticmethod
-    def get_keys() -> Dict[str, str]:
-        return {
-            'barcode': 'Packing.Barcode', 'article': 'Артикул', 'unit_name': 'Packing.Name', 'quantity': 'Packing.Колво',
-            'stock': 'Packing.СвободныйОстаток', 'storage_location': 'Packing.МестоХранения', 'width': 'Packing.Ширина',
-            'density': 'Packing.Плотность', 'compound': 'Packing.Состав', 'price': 'Packing.Цена',
-            'new_price': 'Packing.НоваяЦена', 'discount': 'Packing.Скидка', 'promo_period': 'Packing.СрокАкции',
-            'organization': 'Packing.Организация', 'product_name': 'Наименование', 'description': 'Description',
-            'additional_description': 'AdditionalDescription', 'factory': 'Packing.Производитель', 'code': 'Код',
-            'factory_country': 'Packing.СтранаПроизводства', 'factory_address': 'Packing.АдресПроизводителя'
-        }
-
-    def get_keys_to_remove(self) -> List[str]:
-        keys = self.get_keys()
-        return [
-            keys['factory'], keys['factory_country'], keys['factory_address'], keys['new_price'], keys['organization'],
-            keys['promo_period'], keys['discount'], keys['code'], keys['description'], keys['additional_description']
-        ]
-
-    @staticmethod
-    def get_dict_replacements() -> Dict[str, str]:
-        return {'П/Э': 'Полиэстер', 'П/А': 'Полиамид', 'Металлизированная нить': 'Люрекс', 'альпаки':
-            'альпака', }
-    
-    def validate_row(self, row: Dict[str, str]) -> Optional[Dict[str, str]]:
-        keys = self.get_keys()
-        keys_to_remove = self.get_keys_to_remove()
-        pattern_float = re_compile(r'\d+(?:[\.,]\d+)?')
-        
-        for key in keys_to_remove:
-            row.pop(key, None)
-        
-        # print(row.get(keys['barcode'], ''))
-        # if row.get(keys['barcode'], '') == '2100100565404':
-        #     print(row)
-        
-        # Barcode validation
-        if not self.validate_barcode(row, keys['barcode']):
-            return None
-        
-        # Quantity validation
-        if not self.try_parse_float(row, keys['quantity']):
-            return None
-        
-        # Stock validation
-        if not self.try_parse_float(row, keys['stock']):
-            row[keys['stock']] = 0.0
-
-        # Width validation
-        self.validate_width(row, keys['width'], pattern_float)
-
-        # Factory Address validation
-        self.validate_factory_address(row, keys['factory_address'])
-
-        # Storage Location validation
-        self.validate_storage_location(row, keys['storage_location'])
-
-        # Unit Name validation
-        self.validate_unit_name(row, keys['unit_name'])
-
-        # Compound validation
-        self.validate_compound(row, keys['compound'])
-        # if not self.validate_compound(row, keys['compound']):
-        #     return None
-        
-        return row
-    
-    def validate_barcode(self, row: Dict[str, str], barcode_key: str) -> bool:
-        barcode = row.get(barcode_key, '')
-        if len(barcode) == 13 and barcode.isdigit():
-            if self.env.get('invalid_ean13') and not self.is_valid_ean13(barcode):
-                logger.info(f'Invalid EAN-13 barcode: "{barcode}". This is "CODE-128".')
-                return False
-        else:
-            logger.warning(f'Invalid barcode: "{barcode}": {row}')
-            return False
-        return True
-
-    def validate_width(self, row: Dict[str, str], width_key: str, pattern_float) -> None:
-        width_value = self.get_valid_number(row.get(width_key, ''), self.env.get('max_width', 0), pattern_float)
-        if width_value is None:
-            width_value = self.get_valid_number(row.get('Description', ''), self.env.get('max_width', 0), pattern_float)
-        row[width_key] = width_value
-
-    @staticmethod
-    def validate_factory_address(row: Dict[str, str], factory_address_key: str) -> None:
-        factory_address_value = re_sub(r'\s+', ' ', row.get(factory_address_key, '').replace('адрес:', '').strip())
-        row[factory_address_key] = factory_address_value if factory_address_value else None
-
-    @staticmethod
-    def validate_storage_location(row: Dict[str, str], storage_location_key: str) -> None:
-        storage_location_value = re_sub(r'\s+', ' ', row.get(storage_location_key, '').strip())
-        row[storage_location_key] = [
-            value.strip() for value in storage_location_value.split(',')] if storage_location_value else None
-
-    @staticmethod
-    def validate_unit_name(row: Dict[str, str], unit_name_key: str) -> None:
-        units_value = re_sub(r'\s+', ' ', row.get(unit_name_key, '').replace('.', '').strip())
-        if units_value not in ['м', 'шт']:
-            units_value = 'к-т'  # комплект
-        row[unit_name_key] = units_value
-        
-    def validate_compound(self, row: Dict[str, str], compound_key: str) -> None:
-        compound_value = re_sub(r'\s+', ' ', row.get(compound_key, '').strip())
-        if compound_value:
-            row[compound_key] = self.parse_composition(compound_value, self.get_dict_replacements())
-            sum_compound_value = sum(row[compound_key].values())
-            if sum_compound_value != 100:
-                logger.warning(
-                    f'Shop: {self.data_name}. Compound: Barcode: {row.get(self.get_keys()["barcode"], "")}. '
-                    f'Sum: {sum_compound_value}. Original: {compound_value}. After parse: {row[compound_key]}'
-                )
-                row[compound_key] = None
-        else:
-            row[compound_key] = None
-
-    @staticmethod
-    def try_parse_float(row: Dict[str, str], key: str) -> bool:
-        try:
-            row[key] = float(row.get(key, 0))
-            return True
-        except (ValueError, TypeError):
-            logger.warning(f'Shop: self.data_name. Invalid or None value for {key}: "{row.get(key)}": {row}')
-            return False
-
-    @staticmethod
-    def is_valid_ean13(barcode_ean13: str) -> bool:
-        if len(barcode_ean13) != 13 or not barcode_ean13.isdigit():
-            return False
-        sum_even = sum(int(barcode_ean13[i]) for i in range(1, 12, 2))
-        sum_odd = sum(int(barcode_ean13[i]) for i in range(0, 12, 2))
-        checksum = (10 - (sum_odd + 3 * sum_even) % 10) % 10
-        return checksum == int(barcode_ean13[-1])
-    
-    @staticmethod
-    def get_valid_number(value, max_value, pattern):
-        if isinstance(value, (int, float)) and 0 < value <= max_value:
-            return float(value)
-        elif isinstance(value, str) and value:
-            found_value = re_search(pattern, value)
-            if found_value:
-                number = float(found_value.group().replace(',', '.'))
-                if 0 < number <= max_value:
-                    return number
-        return None
-
-    @staticmethod
-    def parse_composition(composition_str: str, replacements: Dict[str, str]) -> Optional[float]:
-        # Регулярное выражение для поиска составов в формате "XX% материал" или "материал XX%"
-        pattern = r'(\d+(?:[\.,]\d+)?)\s*%?\s*([а-яёa-z]+)|([а-яёa-z]+)\s*(\d+(?:[\.,]\d+)?)\s*%?'
-        composition_dict = {}
-
-        composition_str = composition_str.lower()
-        # Замена сокращений на полные названия
-        for short_name, full_name in replacements.items():
-            composition_str = composition_str.replace(short_name.lower(), full_name.lower())
-
-        matches = re_findall(pattern, composition_str)
-
-        for match in matches:
-            # Определение правильного порядка числа и названия
-            if match[0]:  # Формат "XX% материал"
-                percentage, material = match[0], match[1]
-            else:  # Формат "материал XX%"
-                percentage, material = match[3], match[2]
-
-            # Приведение имени материала к стандартному виду
-            material = material.capitalize()
-            percentage = percentage.replace(',', '.')
-            composition_dict[material] = float(percentage)
-        
-        return composition_dict
-
-    def validate_data(self, data: List[Dict[str, str]]) -> List[Dict[str, str]]:
-        valid_data = []
-        for row in data:
-            validated_row = self.validate_row(row)
-            if validated_row:
-                valid_data.append(validated_row)
-        return valid_data
-
-
 if __name__ == '__main__':
     from asyncio import run as async_run
     from config import get_smb_config
@@ -582,61 +386,32 @@ if __name__ == '__main__':
     smb_config = get_smb_config()
 
     handler = CSVHandler()
-    csv_file_path = os_join(smb_config['to_path'], 'OMS-01.csv')  # Замените на ваш путь
-    print(f'Read file: {csv_file_path}')
-    # valid_records = async_run(handler.process_csv(csv_file_path))
-    #
-    # if valid_records:
-    #     max_num = len(valid_records)
-    #     print(f'Валидация прошла успешно, обработано записей: {max_num}')
-    #     for num in range(max_num):
-    #         if valid_records[num]['Packing.Barcode'] == '2103203216754':
-    #             print(f'{valid_records[num]}')
-    #             break
-    #     # while True:
-    #     #     num = randrange(0, max_num)
-    #     #     print(f'{num} < {max_num}')
-    #     #     place = valid_records[num]['Packing.МестоХранения']
-    #     #     compound = valid_records[num]['Packing.Состав']
-    #     #
-    #     #     if (place is not None and len(place) > 1) or (compound is not None and len(compound) > 1):
-    #     #         print(f'Ширина: {valid_records[num]['Packing.Ширина']}')
-    #     #         print(f'МестоХранения: {place}')
-    #     #         print(f'МестоХранения: {compound}')
-    #     #         print(f'Запись #{num}:')
-    #     #         print(f'{valid_records[num]}')
-    #     #         # for record in valid_records:
-    #     #         #     print(record)
-    #     #         break
-    # else:
-    #     print('Не удалось обработать записи.')
-    
-    handler = EnhancedCSVHandler()
-    csv_file_path = os_join(smb_config['to_path'], 'OMS-01.csv')  # Замените на ваш путь
+    csv_file_path = os_join(smb_config['to_path'], 'UUD-01.csv')  # Замените на ваш путь
     print(f'Read file: {csv_file_path}')
     valid_records = async_run(handler.process_csv(csv_file_path))
-    
+
     if valid_records:
         max_num = len(valid_records)
         print(f'Валидация прошла успешно, обработано записей: {max_num}')
-        # for num in range(max_num):
-        #     if valid_records[num]['Packing.Barcode'] == '2103203216754':
-        #         print(f'{valid_records[num]}')
-        #         break
-        while True:
-            num = randrange(0, max_num)
-            print(f'{num} < {max_num}')
-            place = valid_records[num]['Packing.МестоХранения']
-            compound = valid_records[num]['Packing.Состав']
-
-            if (place is not None and len(place) > 1) or (compound is not None and len(compound) > 1):
-                print(f'Ширина: {valid_records[num]['Packing.Ширина']}')
-                print(f'МестоХранения: {place}')
-                print(f'МестоХранения: {compound}')
-                print(f'Запись #{num}:')
+        for num in range(max_num):
+            if valid_records[num]['Packing.Barcode'] == '2103203216754':
                 print(f'{valid_records[num]}')
-                # for record in valid_records:
-                #     print(record)
                 break
+        # while True:
+        #     num = randrange(0, max_num)
+        #     print(f'{num} < {max_num}')
+        #     place = valid_records[num]['Packing.МестоХранения']
+        #     compound = valid_records[num]['Packing.Состав']
+        #
+        #     if (place is not None and len(place) > 1) or (compound is not None and len(compound) > 1):
+        #         print(f'Ширина: {valid_records[num]['Packing.Ширина']}')
+        #         print(f'МестоХранения: {place}')
+        #         print(f'МестоХранения: {compound}')
+        #         print(f'Запись #{num}:')
+        #         print(f'{valid_records[num]}')
+        #         # for record in valid_records:
+        #         #     print(record)
+        #         break
     else:
         print('Не удалось обработать записи.')
+    

@@ -1,12 +1,12 @@
 __author__ = 'InfSub'
 __contact__ = 'ADmin@TkYD.ru'
 __copyright__ = 'Copyright (C) 2024, [LegioNTeaM] InfSub'
-__date__ = '2024/12/16'
+__date__ = '2024/12/17'
 __deprecated__ = False
 __email__ = 'ADmin@TkYD.ru'
 __maintainer__ = 'InfSub'
 __status__ = 'Development'  # 'Production / Development'
-__version__ = '0.9.8'
+__version__ = '0.9.9'
 
 
 from os import listdir
@@ -19,6 +19,7 @@ from json import loads as json_loads
 from pathlib import Path
 from typing import AsyncIterator, List, Dict, Any, Optional, Tuple
 
+from csv_keys import get_csv_keys
 from config import get_db_config
 
 from logger import logging, setup_logger
@@ -317,9 +318,13 @@ class DatabaseManager:
         else:
             sql_query = f'INSERT INTO {table} ({columns}) VALUES ({placeholders})'
         
-        await cur.execute(sql_query, tuple(item.values()))
-        # logger.info(f'Данные для таблицы "{table}" успешно загружены{" или обновлены" if update_if_exists else ""}.')
-
+        try:
+            await cur.execute(sql_query, tuple(item.values()))
+        except Exception as e:
+            logger.error(f'Ошибка выполнения SQL-запроса: {e}. SQL-query: {sql_query}. Values: {tuple(item.values())}')
+    
+    # logger.info(f'Данные для таблицы "{table}" успешно загружены{" или обновлены" if update_if_exists else ""}.')
+    
 
 # async def get_materials(fetch) -> Dict[str, int]:
 #     materials_result = await fetch('materials')
@@ -328,24 +333,24 @@ class DatabaseManager:
 #         logger.error(f'No materials found.')
 #         return
 #
-#     return {material['material_name']: material['id'] for material in materials_result}
+#     return {material['material_name']: compound['id'] for compound in compounds_result}
 
 
-async def get_materials(fetch_function: Any) -> Optional[Dict[str, int]]:
+async def get_compound(fetch_function: Any) -> Optional[Dict[str, int]]:
     try:
-        materials_result = await fetch_function('materials')
-        if not materials_result:
+        compounds_result = await fetch_function('materials')
+        if not compounds_result:
             logger.error('No materials found.')
             return None
 
-        return {material['material_name']: material['id'] for material in materials_result}
+        return {compound['material_name']: compound['id'] for compound in compounds_result}
     except Exception as e:
         logger.exception(f"Failed to fetch materials: {e}")
         return None
     
 
 async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
-    log_warn_view = True
+    log_warn_view = False
     
     if not wh_short_name:
         logger.error('Parameter "wh_short_name" must not be empty.')
@@ -355,6 +360,7 @@ async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
         logger.error('Parameter "datas" must not be empty.')
         return
 
+    keys = get_csv_keys()
     loop = aio_get_event_loop()
     db_manager = DatabaseManager()
 
@@ -379,7 +385,7 @@ async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
     warehouse_id = warehouse_result[0]['id']
     
     # Получаем список материалов
-    materials_dict = await get_materials(db_manager.fetch_with_dict_cursor)
+    materials_dict = await get_compound(db_manager.fetch_with_dict_cursor)
     if not materials_dict:
         logger.error(f'Dictionary with Materials not found in DB.')
         return
@@ -391,21 +397,21 @@ async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
             async with db_manager.transaction(data) as cur:
                 # logger.info(f'Created transaction for Shop: {wh_short_name}, Barcode: {data["Packing.Barcode"]}')
 
-                key_barcode = 'Packing.Barcode'
-                key_article = 'Артикул'
-                key_width = 'Packing.Ширина'
-                key_name = 'Packing.Name'
-                key_storage = 'Packing.МестоХранения'
-                key_material = 'Packing.Состав'
-                key_quantity = 'Packing.Колво'
-                key_price = 'Packing.Цена'
+                # keys['barcode'] = 'Packing.Barcode'
+                # keys['article'] = 'Артикул'
+                # keys['width'] = 'Packing.Ширина'
+                # keys['unit_name'] = 'Packing.Name'
+                # keys['storage_location'] = 'Packing.МестоХранения'
+                # keys['compound'] = 'Packing.Состав'
+                # keys['quantity'] = 'Packing.Колво'
+                # keys['price'] = 'Packing.Цена'
                 
                 location_name_ids = []  # Список идентификаторов мест хранения
-                if key_storage in data and data[key_storage]:
-                    # print(f'Shop: {wh_short_name}, {key_storage}, {data[key_storage]}')
+                if keys['storage_location'] in data and data[keys['storage_location']]:
+                    # print(f'Shop: {wh_short_name}, {keys['storage_location']}, {data[keys['storage_location']]}')
                     table = 'storage_location_names'
-                    for location_name in data[key_storage]:
-                        # print(f'Shop: {wh_short_name}, {key_storage}, {location_name}')
+                    for location_name in data[keys['storage_location']]:
+                        # print(f'Shop: {wh_short_name}, {keys['storage_location']}, {location_name}')
                         conditions = {'name': location_name}
                         await db_manager.upsert_or_insert_data(cur, table, conditions)
                         
@@ -417,16 +423,16 @@ async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
                 else:
                     if log_warn_view:
                         logger.warning(
-                            f'Shop: {wh_short_name}. Storage Location Names are empty: {data[key_barcode]}')
+                            f'Shop: {wh_short_name}. Storage Location Names are empty: {data[keys['barcode']]}')
                 
                 table = 'products'
-                conditions = {'barcode': data[key_barcode], 'product_name': data[key_article],
-                    'product_units': data[key_name]}
+                conditions = {'barcode': data[keys['barcode']], 'product_name': data[keys['article']],
+                    'product_units': data[keys['unit_name']]}
 
                 # Добавляем условие для ширины только если значение не None или тип количества не равен метрам
-                if data[key_width] is not None or (data[key_name] is not None and data[key_name].lower() != 'м'):
-                    conditions['product_width'] = data[key_width]
-                    # print(f'Shop: {wh_short_name}, added "{key_width}" to {conditions}')
+                if data[keys['width']] is not None or (data[keys['unit_name']] is not None and data[keys['unit_name']].lower() != 'м'):
+                    conditions['product_width'] = data[keys['width']]
+                    # print(f'Shop: {wh_short_name}, added "{keys['width']}" to {conditions}')
                 
                 await db_manager.upsert_or_insert_data(cur, table, conditions)
                 
@@ -434,8 +440,8 @@ async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
                     await db_manager.fetch_with_dict_cursor(table, {'barcode': conditions['barcode']}))[0]['id']
                 
                 table = 'storage_product'
-                conditions = {'product_id': product_id, 'warehouse_id': warehouse_id, 'price': data[key_price],
-                    'quantity': data[key_quantity]}
+                conditions = {'product_id': product_id, 'warehouse_id': warehouse_id, 'price': data[keys['price']],
+                    'quantity': data[keys['quantity']]}
                 
                 await db_manager.upsert_or_insert_data(cur, table, conditions)
                 
@@ -449,14 +455,14 @@ async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
                         await db_manager.upsert_or_insert_data(cur, table, conditions)
 
                 # Обработка и импорт данных о составе
-                if key_material in data and data[key_material]:
-                    # print(f'Shop: {wh_short_name}, key_material: {key_material}, {data[key_material]}')
-                    for material_name, proportion in data[key_material].items():
-                        # print(f'Shop: {wh_short_name}, key_material: {key_material}, material_name: {material_name},'
+                if keys['compound'] in data and data[keys['compound']]:
+                    # print(f'Shop: {wh_short_name}, keys['compound']: {keys['compound']}, {data[keys['compound']]}')
+                    for compound_name, proportion in data[keys['compound']].items():
+                        # print(f'Shop: {wh_short_name}, keys['compound']: {keys['compound']}, compound_name: {compound_name},'
                         #       f' {proportion}')
-                        if material_name in materials_dict:
-                            material_id = materials_dict[material_name]
-                            # print(f'Shop: {wh_short_name}, material_name: {material_name}, material_id: {material_id}')
+                        if compound_name in materials_dict:
+                            material_id = materials_dict[compound_name]
+                            # print(f'Shop: {wh_short_name}, compound_name: {compound_name}, material_id: {material_id}')
                             table = 'product_materials'
                             conditions = {
                                 'product_id': product_id, 'material_id': material_id, 'proportion': proportion}
@@ -464,12 +470,13 @@ async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
                         else:
                             if log_warn_view:
                                 logger.warning(
-                                    f'Shop: {wh_short_name}. Material name: "{material_name}" is not found in DB.')
+                                    f'Shop: {wh_short_name}. Compound name: "{compound_name}" is not found in DB.')
                 
-                # logger.info(f'Finished transaction for Shop: {wh_short_name}, Barcode: {data[key_barcode]}')
+                # logger.info(f'Finished transaction for Shop: {wh_short_name}, Barcode: {data[keys['barcode']]}')
         except Exception as e:
             logger.error(
-                f'Failed to update data for Shop: {wh_short_name}, Barcode: {data[key_barcode]}. Error: {e}.')
+                f'Failed to update data for Shop: {wh_short_name}, Barcode: {data[keys['barcode']]}. Error: {e}. '
+                f'Data: {data}')
     
     await db_manager.close()
     
@@ -479,10 +486,10 @@ async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
     #         async with db_manager.transaction(data) as cur:
     #             # logger.info(f'Created transaction for Shop: {wh_short_name}, Barcode: {data["Packing.Barcode"]}')
     #
-    #             key_storage = 'Packing.МестоХранения'
-    #             if key_storage in data and data[key_storage]:
+    #             keys['storage_location'] = 'Packing.МестоХранения'
+    #             if keys['storage_location'] in data and data[keys['storage_location']]:
     #                 table = 'storage_location_names'
-    #                 conditions = {'name': data[key_storage]}
+    #                 conditions = {'name': data[keys['storage_location']]}
     #                 await db_manager.upsert_or_insert_data(cur, table, conditions)
     #
     #                 location_name_id = cur.lastrowid or (
@@ -505,7 +512,7 @@ async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
     #                           'quantity': data['Packing.Колво']}
     #             await db_manager.upsert_or_insert_data(cur, table, conditions)
     #
-    #             if key_storage in data and data[key_storage]:
+    #             if keys['storage_location'] in data and data[keys['storage_location']]:
     #                 storage_product_id = cur.lastrowid or (await db_manager.fetch_with_dict_cursor(table, {
     #                     'product_id': product_id, 'warehouse_id': warehouse_id}))[0]['id']
     #
@@ -557,10 +564,10 @@ async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
 #             """
 #             Вносим данные о месте хранения или обновляем, если оно уже есть, по уникальному названию
 #             """
-#             key_storage = 'Packing.МестоХранения'
-#             if key_storage in data and data[key_storage]:
+#             keys['storage_location'] = 'Packing.МестоХранения'
+#             if keys['storage_location'] in data and data[keys['storage_location']]:
 #                 table = 'storage_location_names'
-#                 conditions = {'name': data[key_storage]}
+#                 conditions = {'name': data[keys['storage_location']]}
 #                 await db_manager.upsert_or_insert_data(cur, table, conditions)
 #                 logger.info(
 #                     f'Storage Location Name: "{conditions["name"]}" was inserted into the "{table}" '
@@ -570,11 +577,11 @@ async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
 #                 if cur.lastrowid:
 #                     location_name_id = cur.lastrowid
 #                 else:
-#                     conditions = {'name': data[key_storage]}
+#                     conditions = {'name': data[keys['storage_location']]}
 #                     result = await db_manager.fetch_with_dict_cursor(table, conditions)
 #                     location_name_id = result[0]['id']
 #
-#                 logger.info(f'Storage Location Name ID: {location_name_id} for Name: {data[key_storage]}')
+#                 logger.info(f'Storage Location Name ID: {location_name_id} for Name: {data[keys['storage_location']]}')
 #             else:
 #                 logger.warning(f'Storage Location Name is empty: {data["Packing.Barcode"]}')
 #
@@ -611,7 +618,7 @@ async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
 #                 f'"{warehouse_id}" ("{wh_short_name}"). Product Price: "{conditions["price"]}"; '
 #                 f'Product Quantity: "{conditions["quantity"]}".')
 #
-#             if key_storage in data and data[key_storage]:
+#             if keys['storage_location'] in data and data[keys['storage_location']]:
 #                 # Получаем 'storage_product_id'
 #                 if cur.lastrowid:
 #                     storage_product_id = cur.lastrowid
