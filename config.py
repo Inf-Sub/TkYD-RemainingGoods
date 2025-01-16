@@ -25,18 +25,19 @@ def load_env() -> dict:
     # Загрузка всех переменных, которые могут понадобиться в проекте
     return {
         'DB_HOST': getenv('DB_HOST'),
-        'DB_PORT': int(getenv('DB_PORT')),
+        'DB_PORT': int(getenv('DB_PORT', 3306)),
         'DB_USER': getenv('DB_USER'),
         'DB_PASSWORD': getenv('DB_PASSWORD'),
         'DB_NAME': getenv('DB_NAME'),
-        'DB_SCHEMA_DIR': getenv('DB_SCHEMA_DIR'),
+        'DB_SCHEMAS_PATH': getenv('DB_SCHEMAS_PATH'),
         'DB_FILE_INIT_SCHEMA': getenv('DB_FILE_INIT_SCHEMA'),
         'DB_FILE_TABLE_PREFIX': getenv('DB_FILE_TABLE_PREFIX'),
         'DB_FILE_INIT_DATA_PREFIX': getenv('DB_FILE_INIT_DATA_PREFIX'),
 
+
         'SMB_HOSTS': getenv('SHOPS'),
-        'SMB_PORT': int(getenv('SMB_PORT')),
-        'SMB_TIMEOUT': int(getenv('SMB_TIMEOUT')),
+        'SMB_PORT': int(getenv('SMB_PORT', 445)),
+        'SMB_TIMEOUT': int(getenv('SMB_TIMEOUT', 60)),
         'SMB_USER': getenv('SMB_USER'),
         'SMB_PASSWORD': getenv('SMB_PASSWORD'),
         'SMB_HOSTNAME_TEMPLATE': getenv('SMB_HOSTNAME_TEMPLATE'),
@@ -48,21 +49,24 @@ def load_env() -> dict:
         'SMB_LOAD_TO_PATH': getenv('SMB_LOAD_TO_PATH'),
         'SMB_LOAD_FILE_PATTERN': getenv('SMB_LOAD_FILE_PATTERN'),
 
+
         'CSV_DELIMITER': getenv('CSV_DELIMITER'),
-
         'CSV_DATA_INVALID_EAN13': getenv('CSV_DATA_INVALID_EAN13', False).lower() in ('true', '1', 't', 'y', 'yes'),
-        'CSV_DATA_MAX_WIDTH': getenv('CSV_DATA_MAX_WIDTH', 200),
+        'CSV_DATA_MAX_WIDTH': int(getenv('CSV_DATA_MAX_WIDTH', 200)),
+        'CSV_DATA_INVALID_COMPOUND_PATH': getenv('CSV_DATA_INVALID_COMPOUND_PATH'),
 
-        'LOG_DIR': getenv('LOG_DIR'),
+
+        'LOG_PATH': getenv('LOG_PATH', 'logs'),
         'LOG_FILE': getenv('LOG_FILE'),
-        'LOG_LEVEL_CONSOLE': getenv('LOG_LEVEL_CONSOLE'),
-        'LOG_LEVEL_FILE': getenv('LOG_LEVEL_FILE'),
+        'LOG_LEVEL_CONSOLE': getenv('LOG_LEVEL_CONSOLE', 'WARNING'),
+        'LOG_LEVEL_FILE': getenv('LOG_LEVEL_FILE', 'WARNING'),
+
 
         'CHECK_INTERVAL': int(getenv('CHECK_INTERVAL', 60)),  # по умолчанию 60 секунд
         'WORKING_HOURS_START': getenv('WORKING_HOURS_START'),
         'WORKING_HOURS_END': getenv('WORKING_HOURS_END'),
 
-        'STATUS_FILE_PATH': getenv('STATUS_FILE_PATH'),
+        'STATUS_FILE_PATH': getenv('STATUS_FILE_PATH', 'status.log'),
     }
 
 
@@ -77,7 +81,7 @@ def get_db_config() -> dict:
         'user': env['DB_USER'],
         'password': env['DB_PASSWORD'],
         'database': env['DB_NAME'],
-        'db_schema_dir': env['DB_SCHEMA_DIR'],
+        'db_schemas_path': env['DB_SCHEMAS_PATH'],
         'db_file_init_schema': env['DB_FILE_INIT_SCHEMA'],
         'db_file_table_prefix': env['DB_FILE_TABLE_PREFIX'],
         'db_file_init_data_prefix': env['DB_FILE_INIT_DATA_PREFIX'],
@@ -116,7 +120,8 @@ def get_csv_config() -> dict:
         'csv_delimiter': env['CSV_DELIMITER'],
         'invalid_ean13': bool(env['CSV_DATA_INVALID_EAN13']),
         'max_width': int(env['CSV_DATA_MAX_WIDTH']),
-        'log_dir': env['LOG_DIR']
+        'invalid_compound_dir': env['CSV_DATA_INVALID_COMPOUND_PATH'],
+        'log_path': env['LOG_PATH']
 
     }
 
@@ -127,7 +132,7 @@ def get_log_config() -> dict:
     """
     env = load_env()
     return {
-        'path': join(env['LOG_DIR'], dt.now().strftime(env['LOG_FILE'])),
+        'path': join(env['LOG_PATH'], dt.now().strftime(env['LOG_FILE'])),
         'level_console': env['LOG_LEVEL_CONSOLE'],
         'level_file': env['LOG_LEVEL_FILE'],
     }
@@ -159,50 +164,3 @@ if __name__ == '__main__':
     print('Database Config:', get_db_config())
     print('SMB Config:', get_smb_config())
     print('Schedule Config:', get_schedule_config())
-
-# from path import join
-# from pathlib import Path
-# from datetime import datetime as dt
-#
-# # Параметры Git
-# # Путь к локальной директории, где хранится скрипт
-# REPO_DIR = Path(__file__).parent.parent
-# # LOCAL_REPO_DIR = path.dirname(path.dirname(path.realpath(__file__)))
-# # print(f'__file__: {__file__}')
-# # print(path.realpath(__file__))
-# # print(path.dirname(path.realpath(__file__)))
-# # print(path.dirname(path.dirname(path.realpath(__file__))))
-# # print(f'Path: {Path(__file__).parent.parent}')
-#
-#
-# # Наименование директории виртуального окружения
-# VENV_DIR_NAME = '.venv'
-# # Путь к директории виртуального окружения
-# VENV_PATH = join(REPO_DIR, VENV_DIR_NAME)
-#
-# # Logs
-# LOG_DIR_NAME = 'logs'
-# LOG_FILE = dt.now().strftime('logfile_%Y%m%d.log')
-# LOG_DIR = join(REPO_DIR, LOG_DIR_NAME)
-# LOG_PATH = join(LOG_DIR, LOG_FILE)
-# LOG_LEVEL_CONSOLE = 'INFO'
-# LOG_LEVEL_FILE = 'INFO'
-#
-# Path(LOG_DIR).mkdir(parents=True, exist_ok=True)
-# # if not path.exists(LOG_DIR):
-# #     makedirs(LOG_DIR)
-#
-# # Initialize Data:
-# # Наименование директории с данными
-# DATA_DIR_NAME = 'data'
-# # Путь к директории с данными
-# DATA_DIR = join(REPO_DIR, DATA_DIR_NAME)
-#
-# # Path(DATA_DIR).mkdir(parents=True, exist_ok=True)
-#
-#
-# if __name__ == '__main__':
-#     print(
-#         f'LOCAL_REPO_DIR: {REPO_DIR}\nVENV_PATH: {VENV_PATH}\nLOG_FILE: {LOG_FILE}\nLOG_DIR: {LOG_DIR}\n'
-#         f'LOG_PATH: {LOG_PATH}\n'
-#     )

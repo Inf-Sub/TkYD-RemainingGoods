@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS currencies
+create table if not exists currencies
 (
     id            tinyint(1) auto_increment
         primary key,
@@ -6,5 +6,5 @@ CREATE TABLE IF NOT EXISTS currencies
     constraint currency_code
         unique (currency_code)
 )
-    DEFAULT CHARSET=utf8;
-
+    charset=utf8
+    comment 'Список валют';

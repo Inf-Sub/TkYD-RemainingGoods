@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS storage_location_descriptions
+create table if not exists storage_locations_descriptions
 (
     id                   mediumint auto_increment
         primary key,
@@ -6,5 +6,5 @@ CREATE TABLE IF NOT EXISTS storage_location_descriptions
     constraint location_description
         unique (location_description)
 )
-    DEFAULT CHARSET=utf8;
-
+    charset=utf8
+    comment 'Описания наименований мест хранения на складах';

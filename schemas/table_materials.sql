@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS materials
+create table if not exists materials
 (
     id                   tinyint(3) zerofill auto_increment
         primary key,
@@ -9,5 +9,5 @@ CREATE TABLE IF NOT EXISTS materials
     constraint material_name
         unique (material_name)
 )
-    DEFAULT CHARSET=utf8;
-
+    charset=utf8
+    comment 'Список элементов составов';

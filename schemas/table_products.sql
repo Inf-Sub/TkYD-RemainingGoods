@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS products
+create table if not exists products
 (
     id            int auto_increment
         primary key,
@@ -8,8 +8,8 @@ CREATE TABLE IF NOT EXISTS products
     product_units enum ('м', 'шт', 'к-т') default 'м'        not null,
     created_at    timestamp        default CURRENT_TIMESTAMP not null,
     updated_at    timestamp        default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP,
-    constraint nomenclature_number
+    constraint barcode
         unique (barcode)
 )
-    DEFAULT CHARSET=utf8;
-
+    charset=utf8
+    comment 'Список продукции (карточки продукции)';

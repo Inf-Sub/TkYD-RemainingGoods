@@ -1,18 +1,17 @@
 __author__ = 'InfSub'
 __contact__ = 'ADmin@TkYD.ru'
 __copyright__ = 'Copyright (C) 2024, [LegioNTeaM] InfSub'
-__date__ = '2024/12/17'
+__date__ = '2024/12/21'
 __deprecated__ = False
 __email__ = 'ADmin@TkYD.ru'
 __maintainer__ = 'InfSub'
 __status__ = 'Development'  # 'Production / Development'
-__version__ = '0.9.9'
-
+__version__ = '0.9.10'
 
 from os import listdir
 from os.path import join as join, splitext
-from asyncio import run as aio_run, get_event_loop as aio_get_event_loop
-from aiomysql import connect as sql_connect, DictCursor as sql_DictCursor, Error as sql_Error
+from asyncio import run as aio_run, get_event_loop as aio_get_event_loop, sleep as aio_sleep
+from aiomysql import connect as sql_connect, DictCursor as sql_DictCursor, Error as sql_Error, Connection
 from contextlib import asynccontextmanager
 from aiofiles import open as async_open
 from json import loads as json_loads
@@ -34,72 +33,71 @@ logger = logging.getLogger(__name__)
 
 class DatabaseManager:
     def __init__(self):
-        self.env = get_db_config()
-
-        self.host = self.env['host']
-        self.port = self.env['port']
-        self.user = self.env['user']
-        self.password = self.env['password']
-        self.database = self.env['database']
-        self.schema_dir = self.env['db_schema_dir']
-        self.schema_json = self.env['db_file_init_schema']
-        self.table_prefix = self.env['db_file_table_prefix']
-        self.init_data_prefix = self.env['db_file_init_data_prefix']
-        self.conn = None
+        self.env: Dict[str, Any] = get_db_config()
+        self.host: str = self.env['host']
+        self.port: str = self.env['port']
+        self.user: str = self.env['user']
+        self.password: str = self.env['password']
+        self.database: str = self.env['database']
+        self.schemas_path: str = self.env['db_schemas_path']
+        self.schema_json: str = self.env['db_file_init_schema']
+        self.table_prefix: str = self.env['db_file_table_prefix']
+        self.init_data_prefix: str = self.env['db_file_init_data_prefix']
+        self.conn: Optional[Connection] = None
     
     async def connect(self, loop: Optional[Any] = None, db: Optional[str] = None) -> bool:
         """
-        Устанавливает асинхронное соединение с MySQL базой данных с использованием указанных конфигурационных
-        параметров.
-    
-        :param loop: Опционально. Событийный цикл, который будет использоваться для асинхронного подключения.
-        Если не указан, используется текущий событийный цикл.
-        :param db: Опционально. Название базы данных, к которой следует подключиться.
-        Если не указано, используется значение из конфигурации self.database.
-    
-        :return: Возвращает True, если соединение было успешно установлено, и False в случае ошибки.
+        Устанавливает асинхронное соединение с MySQL базой данных, используя параметры конфигурации.
         
-        В случае успешного подключения устанавливает атрибут self.conn, который хранит объект соединения.
-        При возникновении ошибки логирует сообщение об ошибке и возвращает False.
+        При успешном соединении инициализирует self.conn объектом соединения.
+        В случае ошибки логирует её и возвращает False.
+
+        Args:
+            loop (Optional[Any]): Событийный цикл для асинхронного подключения. Если не указан, используется текущий.
+            db (Optional[str]): Имя базы данных для подключения. Если не указано, применяется значение self.database.
+
+        Returns:
+            bool: True, если соединение успешно установлено; False, если произошла ошибка.
+
         """
         try:
-            self.conn = await sql_connect(
-                host=self.host,
-                port=self.port,
-                user=self.user,
-                password=self.password,
-                db=db if db is not None else self.database,
-                loop=loop,
-                autocommit=False
-            )
-            logger.info('Соединение с базой данных установлено.')
+            self.conn = await sql_connect(host=self.host, port=self.port, user=self.user, password=self.password,
+                db=db if db else self.database, loop=loop, autocommit=False)
+            logger.info('Connection to database established.')
             return True
         except sql_Error as e:
-            logger.error(f'Ошибка подключения к MySQL: {e}')
+            logger.error(f'Error connecting to MySQL: {e}')
             return False
-
+    
     async def close(self) -> None:
         """
-        Закрывает соединение с базой данных, если оно активно.
+        Закрывает активное соединение с базой данных.
 
-        После выполнения этого метода объект соединения становится недоступным
-        для других операций до повторного вызова метода connect().
+        При закрытии соединения делает self.conn недоступным для дальнейших операций,
+        до повторного вызова метода connect(). Логирует успешное закрытие соединения.
+
+        Returns:
+            None
         """
         if self.conn:
             self.conn.close()
             self.conn = None
-            logger.info('Соединение с базой данных закрыто.')
-
+            logger.info('Database connection closed.')
+    
     @asynccontextmanager
     async def transaction(self, data: Dict[str, Any]) -> AsyncIterator[None]:
         """
-        Контекстный менеджер для выполнения транзакций.
+        Контекстный менеджер для выполнения транзакций с базой данных.
 
-        Использует курсор для выполнения операций с базой данных.
-        В случае успешного выполнения транзакция подтверждается (commit),
-        при возникновении исключения транзакция отменяется (rollback).
+        Обеспечивает выполнение операций с использованием курсора. При успешном завершении
+        выполняется commit транзакции. При возникновении исключения выполняется rollback,
+        и ошибка логируется вместе с данными транзакции.
 
-        :param data: Данные, связанные с транзакцией, используемые для логирования в случае исключения.
+        Args:
+            data (Dict[str, Any]): Данные, используемые для логирования в случае исключения.
+
+        Returns:
+            AsyncIterator[None]: Асинхронный итератор.
         """
         async with self.conn.cursor() as cur:
             try:
@@ -120,6 +118,9 @@ class DatabaseManager:
         В случае ошибки подключения или выполнения SQL-запроса, ошибка логируется и выбрасывается исключение для
         последующей обработки.
 
+        Returns:
+            None
+
         Исключения:
             OperationalError: Если происходит ошибка при подключении или выполнение SQL-запроса.
         """
@@ -133,11 +134,11 @@ class DatabaseManager:
                     if not result:
                         # Если база данных не существует, создаем ее
                         await cur.execute(f'CREATE DATABASE `{self.database}`')
-                        logger.warning(f'База данных {self.database} успешно создана.')
+                        logger.warning(f'Database "{self.database}" created successfully.')
                     else:
-                        logger.info(f'База данных {self.database} уже существует.')
+                        logger.info(f'Database "{self.database}" already exists.')
         except sql_Error as e:
-            logger.error(f'Ошибка при создании базы данных: {e}')
+            logger.error(f'Error creating database "{self.database}": {e}')
             raise
         finally:
             await self.close()  # Закрываем временное соединение
@@ -149,10 +150,11 @@ class DatabaseManager:
         Загружает схемы таблиц из JSON-файла, если он существует, или в алфавитном порядке из указанной директории.
         Попытка создать каждую таблицу, если она не существует, и инициализировать данные, используя соответствующие файлы.
 
-        :return: None
+        Returns:
+            None
         """
         async with self.conn.cursor() as cur:
-            schema_json_path = str(join(self.schema_dir, self.schema_json))
+            schema_json_path = str(join(self.schemas_path, self.schema_json))
 
             if Path(schema_json_path).exists():
                 logger.info(
@@ -164,12 +166,12 @@ class DatabaseManager:
                     schema_files_info = json_loads(content)
             else:
                 logger.warning(
-                    f'Файл схемы: {schema_json_path} - не найден, загружаем списки таблиц и фвйлов данных для '
-                    f'инициализации в алфавитном порядке.')
+                    f'Schema file: {schema_json_path} - not found, loading lists of tables and data files for '
+                    f'initialization in alphabetical order.')
                 # Загрузка файлов из директории (алфавитный порядок)
                 schema_files_info = {
                     self.table_prefix: [
-                        filename for filename in listdir(self.schema_dir)
+                        filename for filename in listdir(self.schemas_path)
                         if filename.startswith(self.table_prefix) and filename.endswith('.sql')
                     ],
                     self.init_data_prefix: {}
@@ -177,7 +179,7 @@ class DatabaseManager:
 
             if self.table_prefix in schema_files_info:
             # if schema_files_info.get(self.table_prefix, {}):
-                logger.info(f'Список файлов таблиц БД загружен.')
+                logger.info(f'List of DB table files loaded.')
 
                 tables = await self._load_schemas(schema_files_info[self.table_prefix])
 
@@ -189,7 +191,7 @@ class DatabaseManager:
                         # If table is created, insert the initial data if available
                         # Инициализация данных, если имя файла указано в файле схемы
                         if table in schema_files_info.get(self.init_data_prefix, {}):
-                            logger.info(f'Имя таблицы: "{table}" найдено в списке импорта инициализационных данных.')
+                            logger.info(f'Table name: "{table}" found in initialization data import list.')
                             data_file = schema_files_info[self.init_data_prefix][table]
 
                         logger.info(f'Файл инициализации данных: "{data_file}".')
@@ -197,7 +199,8 @@ class DatabaseManager:
                         await self._load_initial_data(cur, table, data_file)
 
             else:
-                logger.error(f'Список файлов таблиц БД пуст или префикс "{self.table_prefix}" указан не верно.')
+                logger.error(
+                    f'The list of database table files is empty or the prefix "{self.table_prefix}" is incorrect.')
 
         await self.conn.commit()  # Commit all changes once tables are created and initial data is loaded
 
@@ -207,10 +210,13 @@ class DatabaseManager:
         Извлечение данных из таблицы. Условия должны быть в виде словаря, где ключи — это имена столбцов,
         а значения — искомые значения.
 
-        :param cur: курсор для выполнения SQL-запросов
-        :param table: название таблицы
-        :param conditions: условия выборки данных (опционально)
-        :return: список строк, соответствующих условиям
+        Args:
+            cur (Any): курсор для выполнения SQL-запросов
+            table (str): название таблицы
+            conditions (Optional[Dict[str, Any]], optional): условия выборки данных (опционально)
+        
+        Returns:
+            List[Tuple[Any, ...]]: список строк, соответствующих условиям
         """
         sql_query = f'SELECT * FROM {table}'
 
@@ -229,9 +235,13 @@ class DatabaseManager:
         """
         Извлекает данные из таблицы, используя курсор, возвращающий строки в виде словарей.
 
-        :param table: Название таблицы, из которой необходимо извлечь данные.
-        :param conditions: Словарь условий для выборки данных (опционально).
-        :return: Список словарей, где каждый словарь представляет строку данных с именами столбцов в качестве ключей.
+        Args:
+            table (str): Название таблицы, из которой необходимо извлечь данные.
+            conditions (Optional[Dict[str, Any]]): Словарь условий для выборки данных (опционально).
+        
+        Returns:
+            List[Dict[str, Any]]: Список словарей, где каждый словарь представляет строку данных с именами
+            столбцов в качестве ключей.
         """
         async with self.conn.cursor(sql_DictCursor) as cur:
             return await self.fetch_data(cur, table, conditions)
@@ -240,14 +250,14 @@ class DatabaseManager:
         """
         Асинхронно загружает схемы таблиц из списка файлов.
 
-        :param files_list: Список файлов, содержащих схемы таблиц.
+        files_list: Список файлов, содержащих схемы таблиц.
         :return: Словарь, где ключами являются имена таблиц, а значениями — содержимое файлов схем.
         """
         tables = {}
         for filename in files_list:
             table_name = splitext(filename)[0].replace(f'{self.table_prefix}_', '')
 
-            async with async_open(join(self.schema_dir, filename), 'r', encoding='utf-8') as f:
+            async with async_open(join(self.schemas_path, filename), 'r', encoding='utf-8') as f:
                 content = await f.read()
                 tables[table_name] = content
         return tables
@@ -257,10 +267,13 @@ class DatabaseManager:
         """
         Асинхронно проверяет существование таблицы в базе данных и создает её, если она не существует.
 
-        :param cur: Курсор базы данных для выполнения SQL-запросов.
-        :param table: Имя таблицы.
-        :param schema: SQL-схема для создания таблицы.
-        :return: Булево значение, указывающее на то, была ли таблица создана (True) или уже существовала (False).
+        Args:
+            cur (Any): Курсор базы данных для выполнения SQL-запросов.
+            table (str): Имя таблицы.
+            schema (str): SQL-схема для создания таблицы.
+        
+        Returns:
+            bool: Булево значение, указывающее на то, была ли таблица создана (True) или уже существовала (False).
         """
         await cur.execute(f'SHOW TABLES LIKE "{table}";')
         result = await cur.fetchone()
@@ -278,14 +291,18 @@ class DatabaseManager:
         """
         Асинхронно загружает начальные данные в указанную таблицу из файла.
 
-        :param cur: Курсор базы данных для выполнения SQL-запросов.
-        :param table: Имя таблицы для загрузки данных.
-        :param data_file: Имя файла, содержащего начальные данные в формате JSON.
+        Args:
+            cur (Any): Курсор базы данных для выполнения SQL-запросов.
+            table (str): Имя таблицы для загрузки данных.
+            data_file (str): Имя файла, содержащего начальные данные в формате JSON.
+        
+        Returns:
+            None
         """
         if data_file is None:
             return
 
-        data_path = str(join(self.schema_dir, data_file))
+        data_path = str(join(self.schemas_path, data_file))
 
         if Path(data_path).exists():
             async with async_open(data_path, 'r', encoding='utf-8') as f:
@@ -302,11 +319,15 @@ class DatabaseManager:
         """
         Вставка новых данных в таблицу или, в случае конфликта, обновление существующих данных.
 
-        :param cur: курсор для выполнения SQL-запросов
-        :param table: название таблицы, в которую будут вставлены или обновлены данные
-        :param item: словарь, представляющий данные для вставки или обновления, где ключи — это имена столбцов,
-                     а значения — вставляемые данные
-        :param update_if_exists: флаг, указывающий, следует ли обновлять данные в случае конфликта
+        Args:
+            cur (Any): Курсор для выполнения SQL-запросов
+            table (str): Название таблицы, в которую будут вставлены или обновлены данные
+            item (Dict[str, Any]): Словарь, представляющий данные для вставки или обновления, где ключи — это имена
+            столбцов, а значения — вставляемые данные
+            update_if_exists (bool, optional): Флаг, указывающий, следует ли обновлять данные в случае конфликта
+        
+        Returns:
+            None
         """
         columns = ', '.join(item.keys())
         placeholders = ', '.join(['%s'] * len(item))
@@ -337,6 +358,18 @@ class DatabaseManager:
 
 
 async def get_compound(fetch_function: Any) -> Optional[Dict[str, int]]:
+    """
+    Асинхронная функция, которая извлекает список материалов и создает словарь,
+    сопоставляющий имя материала с его идентификатором.
+
+    Args:
+        fetch_function (Any): Функция, используемая для извлечения данных о материалах. Она должна быть
+        асинхронной и принимать строку 'materials' в качестве аргумента для извлечения данных.
+
+    Returns:
+        Optional[Dict[str, int]]: Словарь, где ключи — это имена материалов, а значения — их идентификаторы.
+        Возвращает None, если данные не были найдены или произошла ошибка во время извлечения данных.
+    """
     try:
         compounds_result = await fetch_function('materials')
         if not compounds_result:
@@ -349,9 +382,10 @@ async def get_compound(fetch_function: Any) -> Optional[Dict[str, int]]:
         return None
     
 
+# version 2.1
 async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
     log_warn_view = False
-    
+
     if not wh_short_name:
         logger.error('Parameter "wh_short_name" must not be empty.')
         return
@@ -366,12 +400,32 @@ async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
 
     # Создаем базу данных, если ее нет
     await db_manager.create_database()
-
-    # Установление соединения с базой данных
-    if not await db_manager.connect(loop):
-        logger.error('Exit: Ошибка подключения к базе данных.')
-        return
     
+    # # Установление соединения с базой данных
+    # if not await db_manager.connect(loop):
+    #     logger.error('Exit: Ошибка подключения к базе данных.')
+    #     return
+
+    max_retries = 3
+    retry_attempt = 0
+    connected = False
+
+    # Пытаемся подключиться с повторными попытками
+    while retry_attempt < max_retries:
+        try:
+            # Установление соединения с базой данных
+            connected = await db_manager.connect(loop)
+            if connected:
+                break
+        except ConnectionError as e:
+            logger.error(f'Ошибка подключения: {e}. Попытка {retry_attempt + 1} из {max_retries}.')
+            retry_attempt += 1
+            await aio_sleep(2)  # Ожидаем 2 секунды перед повторной попыткой
+
+    if not connected:
+        logger.error('Exit: Ошибка подключения к базе данных после нескольких попыток.')
+        return
+
     await db_manager.create_tables()
     
     # Получаем ID склада
@@ -383,15 +437,13 @@ async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
         return
     
     warehouse_id = warehouse_result[0]['id']
-    
+
     # Получаем список материалов
     materials_dict = await get_compound(db_manager.fetch_with_dict_cursor)
     if not materials_dict:
         logger.error(f'Dictionary with Materials not found in DB.')
         return
-    
 
-    # version 2
     for data in datas:
         try:
             async with db_manager.transaction(data) as cur:
@@ -405,65 +457,58 @@ async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
                 # keys['compound'] = 'Packing.Состав'
                 # keys['quantity'] = 'Packing.Колво'
                 # keys['price'] = 'Packing.Цена'
-                
+
                 location_name_ids = []  # Список идентификаторов мест хранения
                 if keys['storage_location'] in data and data[keys['storage_location']]:
-                    # print(f'Shop: {wh_short_name}, {keys['storage_location']}, {data[keys['storage_location']]}')
-                    table = 'storage_location_names'
+                    table = 'storage_locations_names'
                     for location_name in data[keys['storage_location']]:
-                        # print(f'Shop: {wh_short_name}, {keys['storage_location']}, {location_name}')
                         conditions = {'name': location_name}
                         await db_manager.upsert_or_insert_data(cur, table, conditions)
-                        
+
                         location_name_id = cur.lastrowid or (
                             await db_manager.fetch_with_dict_cursor(table, conditions))[0]['id']
-                        # print(f'Shop: {wh_short_name}, location_name_id: {location_name_id}')
                         location_name_ids.append(location_name_id)
-                        # print(f'Shop: {wh_short_name}, location_name_ids: {location_name_ids}')
                 else:
                     if log_warn_view:
                         logger.warning(
                             f'Shop: {wh_short_name}. Storage Location Names are empty: {data[keys['barcode']]}')
-                
+
                 table = 'products'
                 conditions = {'barcode': data[keys['barcode']], 'product_name': data[keys['article']],
                     'product_units': data[keys['unit_name']]}
-
+                
                 # Добавляем условие для ширины только если значение не None или тип количества не равен метрам
-                if data[keys['width']] is not None or (data[keys['unit_name']] is not None and data[keys['unit_name']].lower() != 'м'):
+                if data[keys['width']] is not None or (
+                        data[keys['unit_name']] is not None and data[keys['unit_name']].lower() != 'м'):
                     conditions['product_width'] = data[keys['width']]
-                    # print(f'Shop: {wh_short_name}, added "{keys['width']}" to {conditions}')
-                
+
                 await db_manager.upsert_or_insert_data(cur, table, conditions)
-                
-                product_id = cur.lastrowid or (
-                    await db_manager.fetch_with_dict_cursor(table, {'barcode': conditions['barcode']}))[0]['id']
-                
-                table = 'storage_product'
-                conditions = {'product_id': product_id, 'warehouse_id': warehouse_id, 'price': data[keys['price']],
+
+                product_id = cur.lastrowid or (await db_manager.fetch_with_dict_cursor(table, {
+                    'barcode': conditions['barcode']}))[0]['id']
+
+                table = 'products_on_warehouses'
+                conditions = {
+                    'product_id': product_id, 'warehouse_id': warehouse_id, 'price': data[keys['price']],
                     'quantity': data[keys['quantity']]}
-                
+
                 await db_manager.upsert_or_insert_data(cur, table, conditions)
-                
+
                 if location_name_ids:
                     storage_product_id = cur.lastrowid or (await db_manager.fetch_with_dict_cursor(table, {
                         'product_id': product_id, 'warehouse_id': warehouse_id}))[0]['id']
-                    
+
                     table = 'storage_locations'
                     for location_name_id in location_name_ids:
                         conditions = {'storage_product_id': storage_product_id, 'location_name_id': location_name_id}
                         await db_manager.upsert_or_insert_data(cur, table, conditions)
-
+                
                 # Обработка и импорт данных о составе
                 if keys['compound'] in data and data[keys['compound']]:
-                    # print(f'Shop: {wh_short_name}, keys['compound']: {keys['compound']}, {data[keys['compound']]}')
                     for compound_name, proportion in data[keys['compound']].items():
-                        # print(f'Shop: {wh_short_name}, keys['compound']: {keys['compound']}, compound_name: {compound_name},'
-                        #       f' {proportion}')
                         if compound_name in materials_dict:
                             material_id = materials_dict[compound_name]
-                            # print(f'Shop: {wh_short_name}, compound_name: {compound_name}, material_id: {material_id}')
-                            table = 'product_materials'
+                            table = 'products_materials'
                             conditions = {
                                 'product_id': product_id, 'material_id': material_id, 'proportion': proportion}
                             await db_manager.upsert_or_insert_data(cur, table, conditions)
@@ -471,14 +516,149 @@ async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
                             if log_warn_view:
                                 logger.warning(
                                     f'Shop: {wh_short_name}. Compound name: "{compound_name}" is not found in DB.')
-                
+
                 # logger.info(f'Finished transaction for Shop: {wh_short_name}, Barcode: {data[keys['barcode']]}')
         except Exception as e:
             logger.error(
                 f'Failed to update data for Shop: {wh_short_name}, Barcode: {data[keys['barcode']]}. Error: {e}. '
                 f'Data: {data}')
-    
+
     await db_manager.close()
+
+
+
+
+# version 2
+# async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
+#     log_warn_view = False
+#
+#     if not wh_short_name:
+#         logger.error('Parameter "wh_short_name" must not be empty.')
+#         return
+#
+#     if not datas:
+#         logger.error('Parameter "datas" must not be empty.')
+#         return
+#
+#     keys = get_csv_keys()
+#     loop = aio_get_event_loop()
+#     db_manager = DatabaseManager()
+#
+#     # Создаем базу данных, если ее нет
+#     await db_manager.create_database()
+#
+#     # Установление соединения с базой данных
+#     if not await db_manager.connect(loop):
+#         logger.error('Exit: Ошибка подключения к базе данных.')
+#         return
+#
+#     await db_manager.create_tables()
+#
+#     # Получаем ID склада
+#     warehouse_conditions = {'warehouse_short_name': wh_short_name}
+#     warehouse_result = await db_manager.fetch_with_dict_cursor('warehouses', warehouse_conditions)
+#
+#     if not warehouse_result:
+#         logger.error(f'No warehouse found with short name: {wh_short_name}')
+#         return
+#
+#     warehouse_id = warehouse_result[0]['id']
+#
+#     # Получаем список материалов
+#     materials_dict = await get_compound(db_manager.fetch_with_dict_cursor)
+#     if not materials_dict:
+#         logger.error(f'Dictionary with Materials not found in DB.')
+#         return
+#
+#     # version 2
+#     for data in datas:
+#         try:
+#             async with db_manager.transaction(data) as cur:
+#                 # logger.info(f'Created transaction for Shop: {wh_short_name}, Barcode: {data["Packing.Barcode"]}')
+#
+#                 # keys['barcode'] = 'Packing.Barcode'
+#                 # keys['article'] = 'Артикул'
+#                 # keys['width'] = 'Packing.Ширина'
+#                 # keys['unit_name'] = 'Packing.Name'
+#                 # keys['storage_location'] = 'Packing.МестоХранения'
+#                 # keys['compound'] = 'Packing.Состав'
+#                 # keys['quantity'] = 'Packing.Колво'
+#                 # keys['price'] = 'Packing.Цена'
+#
+#                 location_name_ids = []  # Список идентификаторов мест хранения
+#                 if keys['storage_location'] in data and data[keys['storage_location']]:
+#                     # print(f'Shop: {wh_short_name}, {keys['storage_location']}, {data[keys['storage_location']]}')
+#                     table = 'storage_locations_names'
+#                     for location_name in data[keys['storage_location']]:
+#                         # print(f'Shop: {wh_short_name}, {keys['storage_location']}, {location_name}')
+#                         conditions = {'name': location_name}
+#                         await db_manager.upsert_or_insert_data(cur, table, conditions)
+#
+#                         location_name_id = cur.lastrowid or (
+#                             await db_manager.fetch_with_dict_cursor(table, conditions))[0]['id']
+#                         # print(f'Shop: {wh_short_name}, location_name_id: {location_name_id}')
+#                         location_name_ids.append(location_name_id)
+#                         # print(f'Shop: {wh_short_name}, location_name_ids: {location_name_ids}')
+#                 else:
+#                     if log_warn_view:
+#                         logger.warning(
+#                             f'Shop: {wh_short_name}. Storage Location Names are empty: {data[keys['barcode']]}')
+#
+#                 table = 'products'
+#                 conditions = {'barcode': data[keys['barcode']], 'product_name': data[keys['article']],
+#                     'product_units': data[keys['unit_name']]}
+#
+#                 # Добавляем условие для ширины только если значение не None или тип количества не равен метрам
+#                 if data[keys['width']] is not None or (data[keys['unit_name']] is not None and data[keys['unit_name']].lower() != 'м'):
+#                     conditions['product_width'] = data[keys['width']]
+#                     # print(f'Shop: {wh_short_name}, added "{keys['width']}" to {conditions}')
+#
+#                 await db_manager.upsert_or_insert_data(cur, table, conditions)
+#
+#                 product_id = cur.lastrowid or (
+#                     await db_manager.fetch_with_dict_cursor(table, {'barcode': conditions['barcode']}))[0]['id']
+#
+#                 table = 'products_on_warehouses'
+#                 conditions = {'product_id': product_id, 'warehouse_id': warehouse_id, 'price': data[keys['price']],
+#                     'quantity': data[keys['quantity']]}
+#
+#                 await db_manager.upsert_or_insert_data(cur, table, conditions)
+#
+#                 if location_name_ids:
+#                     storage_product_id = cur.lastrowid or (await db_manager.fetch_with_dict_cursor(table, {
+#                         'product_id': product_id, 'warehouse_id': warehouse_id}))[0]['id']
+#
+#                     table = 'storage_locations'
+#                     for location_name_id in location_name_ids:
+#                         conditions = {'storage_product_id': storage_product_id, 'location_name_id': location_name_id}
+#                         await db_manager.upsert_or_insert_data(cur, table, conditions)
+#
+#                 # Обработка и импорт данных о составе
+#                 if keys['compound'] in data and data[keys['compound']]:
+#                     # print(f'Shop: {wh_short_name}, keys['compound']: {keys['compound']}, {data[keys['compound']]}')
+#                     for compound_name, proportion in data[keys['compound']].items():
+#                         # print(f'Shop: {wh_short_name}, keys['compound']: {keys['compound']}, compound_name: {compound_name},'
+#                         #       f' {proportion}')
+#                         if compound_name in materials_dict:
+#                             material_id = materials_dict[compound_name]
+#                             # print(f'Shop: {wh_short_name}, compound_name: {compound_name}, material_id: {material_id}')
+#                             table = 'products_materials'
+#                             conditions = {
+#                                 'product_id': product_id, 'material_id': material_id, 'proportion': proportion}
+#                             await db_manager.upsert_or_insert_data(cur, table, conditions)
+#                         else:
+#                             if log_warn_view:
+#                                 logger.warning(
+#                                     f'Shop: {wh_short_name}. Compound name: "{compound_name}" is not found in DB.')
+#
+#                 # logger.info(f'Finished transaction for Shop: {wh_short_name}, Barcode: {data[keys['barcode']]}')
+#         except Exception as e:
+#             logger.error(
+#                 f'Failed to update data for Shop: {wh_short_name}, Barcode: {data[keys['barcode']]}. Error: {e}. '
+#                 f'Data: {data}')
+#
+#     await db_manager.close()
+    
     
     # version 1
     # for data in datas:
@@ -488,7 +668,7 @@ async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
     #
     #             keys['storage_location'] = 'Packing.МестоХранения'
     #             if keys['storage_location'] in data and data[keys['storage_location']]:
-    #                 table = 'storage_location_names'
+    #                 table = 'storage_locations_names'
     #                 conditions = {'name': data[keys['storage_location']]}
     #                 await db_manager.upsert_or_insert_data(cur, table, conditions)
     #
@@ -507,7 +687,7 @@ async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
     #                 await db_manager.fetch_with_dict_cursor(table, {'barcode': conditions['barcode']})
     #             )[0]['id']
     #
-    #             table = 'storage_product'
+    #             table = 'products_on_warehouses'
     #             conditions = {'product_id': product_id, 'warehouse_id': warehouse_id, 'price': data['Packing.Цена'],
     #                           'quantity': data['Packing.Колво']}
     #             await db_manager.upsert_or_insert_data(cur, table, conditions)
@@ -566,7 +746,7 @@ async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
 #             """
 #             keys['storage_location'] = 'Packing.МестоХранения'
 #             if keys['storage_location'] in data and data[keys['storage_location']]:
-#                 table = 'storage_location_names'
+#                 table = 'storage_locations_names'
 #                 conditions = {'name': data[keys['storage_location']]}
 #                 await db_manager.upsert_or_insert_data(cur, table, conditions)
 #                 logger.info(
@@ -608,7 +788,7 @@ async def update_data(wh_short_name: str, datas: List[Dict[str, Any]]) -> None:
 #
 #             logger.info(f'Product ID: {product_id}')
 #
-#             table = 'storage_product'
+#             table = 'products_on_warehouses'
 #             conditions = {
 #                 'product_id': product_id, 'warehouse_id': warehouse_id, 'price': data['Packing.Цена'],
 #                 'quantity': data['Packing.Колво']}

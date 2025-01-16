@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS warehouses
+create table if not exists warehouses
 (
     id                   smallint(3) auto_increment
         primary key,
@@ -13,8 +13,5 @@ CREATE TABLE IF NOT EXISTS warehouses
     constraint FK_warehouses_currencies
         foreign key (currency_id) references currencies (id)
 )
-    DEFAULT CHARSET=utf8;
-
-
-
-
+    charset=utf8
+    comment 'Список складов';

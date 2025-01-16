@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS product_photos
+create table if not exists products_photos
 (
     id          int auto_increment
         primary key,
@@ -7,9 +7,9 @@ CREATE TABLE IF NOT EXISTS product_photos
     photo_url   varchar(255)                        not null comment 'Ссылка на фото товара',
     created_at  timestamp default CURRENT_TIMESTAMP not null,
     updated_at  timestamp default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP,
-    constraint FK_product_photos_products
+    constraint FK_products_photos_products
         foreign key (product_id) references products (id)
             on delete cascade
 )
-    DEFAULT CHARSET=utf8;
-
+    charset = utf8
+    comment 'Фотографии товара';

@@ -50,7 +50,7 @@ class CSVHandler:
         encoding = await self.detect_encoding(input_file)
 
         if encoding is None:
-            logger.error(f'Unable to determine encoding of file {input_file.name}.')
+            logger.error(f'Unable to determine encoding of file {input_file.name}. Encoding is None')
             return
 
         if encoding != output_encode:
@@ -117,7 +117,7 @@ if __name__ == '__main__':
     smb_config = get_smb_config()
 
     handler = CSVHandler()
-    csv_file_path = os_join(smb_config['to_path'], 'UUD-01.csv')  # Замените на ваш путь
+    csv_file_path = os_join(smb_config['to_path'], 'TST.csv')  # Замените на ваш путь
     print(f'Read file: {csv_file_path}')
     valid_records = async_run(handler.process_csv(csv_file_path))
 

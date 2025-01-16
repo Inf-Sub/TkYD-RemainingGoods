@@ -167,4 +167,4 @@ DCT_*/
 run_*.py
 *_v*.py
 test_*.py
-work/
+examples/.code/*

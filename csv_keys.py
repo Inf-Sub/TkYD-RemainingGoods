@@ -12,11 +12,26 @@ from typing import Dict
 
 
 def get_csv_keys() -> Dict[str, str]:
-    return {'barcode': 'Packing.Barcode', 'article': 'Артикул', 'unit_name': 'Packing.Name',
-            'quantity': 'Packing.Колво', 'stock': 'Packing.СвободныйОстаток',
-            'storage_location': 'Packing.МестоХранения', 'width': 'Packing.Ширина', 'density': 'Packing.Плотность',
-            'compound': 'Packing.Состав', 'price': 'Packing.Цена', 'new_price': 'Packing.НоваяЦена',
-            'discount': 'Packing.Скидка', 'promo_period': 'Packing.СрокАкции', 'organization': 'Packing.Организация',
-            'product_name': 'Наименование', 'description': 'Description',
-            'additional_description': 'AdditionalDescription', 'factory': 'Packing.Производитель', 'code': 'Код',
-            'factory_country': 'Packing.СтранаПроизводства', 'factory_address': 'Packing.АдресПроизводителя'}
+    return {
+            'barcode': 'Packing.Barcode',
+            'article': 'Артикул',
+            'unit_name': 'Packing.Name',
+            'quantity': 'Packing.Колво',
+            'stock': 'Packing.СвободныйОстаток',
+            'storage_location': 'Packing.МестоХранения',
+            'width': 'Packing.Ширина',
+            'density': 'Packing.Плотность',
+            'compound': 'Packing.Состав',
+            'price': 'Packing.Цена',
+            'new_price': 'Packing.НоваяЦена',
+            'discount': 'Packing.Скидка',
+            'promo_period': 'Packing.СрокАкции',
+            'organization': 'Packing.Организация',
+            'product_name': 'Наименование',
+            'description': 'Description',
+            'additional_description': 'AdditionalDescription',
+            'factory': 'Packing.Производитель',
+            'code': 'Код',
+            'factory_country': 'Packing.СтранаПроизводства',
+            'factory_address': 'Packing.АдресПроизводителя',
+    }
