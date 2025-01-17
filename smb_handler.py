@@ -6,20 +6,21 @@ __deprecated__ = False
 __email__ = 'ADmin@TkYD.ru'
 __maintainer__ = 'InfSub'
 __status__ = 'Production'
-__version__ = '2.8.1'
+__version__ = '2.8.3'
 
 # from pprint import pprint
-from typing import Dict, Union
+from typing import Dict, Optional, Union
 from os import remove as os_remove
 from os.path import join as os_join, getsize as os_getsize, getmtime as os_getmtime
 from pathlib import Path
-from asyncio import sleep as aio_sleep, get_event_loop
+from asyncio import sleep as aio_sleep, get_event_loop, to_thread as aio_to_thread
 from aiofiles import open as aio_open
 from concurrent.futures import ThreadPoolExecutor
 from fnmatch import fnmatch
 from ping3 import ping
 from errno import EACCES as ERRNO_EACCES
 from smbclient import ClientConfig, listdir, open_file
+# from smb.SMBConnection import SMBConnection
 from smbprotocol.exceptions import SMBConnectionClosed
 
 from logger import logging, setup_logger  # импортируем наш модуль с настройками логгера
@@ -29,16 +30,28 @@ setup_logger()
 logger = logging.getLogger(__name__)
 
 
-# class SmbHandler:
-#     def __init__(self, config: Dict[str, Union[str, bool]]) -> None:
 class SmbHandler:
-    def __init__(self, server: str, username: str, password: str) -> None:
+    def __init__(self, config: Dict[str, Union[str, bool]]) -> None:
+    # def __init__(self, server: str, username: str, password: str) -> None:
+    #     """
+    #     for ver.: 2.8.x:
+    #     Инициализирует экземпляр класса SmbHandler с необходимыми параметрами для подключения к SMB-серверу.
+    #
+    #     :param server: Адрес или имя SMB-сервера.
+    #     :type server: str
+    #     :param username: Имя пользователя для аутентификации на сервере.
+    #     :type username: str
+    #     :param password: Пароль для аутентификации на сервере.
+    #     :type password: str
+    #     :return: None
+    #     """
         """
+        for ver.: 2.9.x:
         Инициализирует экземпляр класса SmbHandler с параметрами для подключения к SMB-серверу.
 
         :param config: Словарь с параметрами конфигурации.
         :type config: Dict[str, Union[str, bool]]
-        
+
         config: Словарь с параметрами конфигурации, включающий:
             - 'server': адрес или имя SMB-сервера (str),
             - 'username': имя пользователя для аутентификации на сервере (str),
@@ -51,45 +64,68 @@ class SmbHandler:
 
         :return: None
         """
-        self.server: str = server
-        self.username: str = username
-        self.password: str = password
-        
-        # self.server: str = config['server']
-        # self.username: str = config['username']
-        # self.password: str = config['password']
-        # self.share: str = config['share']
-        # self.remote_path: str = config['remote_path']
-        # self.file_pattern: str = config['file_pattern']
-        # self.download_path: str = config['download_path']
-        # self.download_file_name: str = config['download_file_name']
-        
+        try:
+            self.server: str = config['host']
+            self.port: str = config['port']
+            self.username: str = config['username']
+            self.password: str = config['password']
+            self.share: str = config['share']
+            self.remote_path: str = config['remote_path']
+            self.file_pattern: str = config['file_pattern']
+            self.download_path: str = config['download_path']
+            self.download_file_name: str = config['download_file_name']
+            self.debug_mode: bool = config['debug_mode']
+        except KeyError as e:
+            logger.error(f'Missing configuration key: {e}')
+
+        self.network_path = None
         self.max_retries: int = 3  # Максимальное количество попыток
         self.connection: bool = None  # Изначально соединение не установлено.
     
-    async def connect(self, network_path: str) -> bool:
+    async def connect_and_prepare(self) -> bool:
+        if not await self.async_ping():
+            logger.warning(f'Хост: {self.server} - недоступен.')
+            return False
+        
+        logger.info(f'Хост: {self.server} - доступен. Подключение к сетевой шаре {self.share} ...')
+        self.network_path = await self.create_network_path_async()
+        return True
+
+    async def connect(self, network_path: str = None) -> bool:
         """
-        Establishes a connection to the given network path.
-
-        The method attempts to connect to the specified network path. If an error occurs
-        during the connection attempt, it logs the error and returns False.
-
         Устанавливает соединение с заданным сетевым путем.
 
         Метод пытается установить соединение с указанным сетевым путем. Если во время
         попытки соединения возникает ошибка, она логируется, и метод возвращает False.
 
         :param network_path: Путь к сетевой директории, с которой нужно установить соединение.
-        :type network_path: str
+        :type network_path: str, optional
 
         :return: True, если соединение успешно установлено, иначе False.
         :rtype: bool
 
+        :raises ValueError: Если сетевой путь не указан.
         :raises Exception: Логирует ошибку при возникновении ошибки соединения.
         """
+        network_path = network_path if network_path is not None else self.network_path
+        if not network_path:
+            if not self.debug_mode:
+                logger.error('Не указан сетевой путь.')
+            else:
+                raise ValueError('Не указан сетевой путь.')
+        
         # Конфигурируем клиента с предоставленными учетными данными.
+        # logger.warning(f'ClientConfig(username={self.username}, password={self.password})')
         ClientConfig(username=self.username, password=self.password)
+        
         try:
+            # # Создаем SMB соединение.
+            # smb_connection = SMBConnection(self.username, self.password, 'client_machine', self.server)
+            # connected = await aio_to_thread(smb_connection.connect, network_path, self.port)
+            # if connected:
+            #     self.connection = smb_connection
+            #     logger.info(f'Successfully connected to {network_path}')
+
             listdir(network_path)  # Пытаемся получить список файлов, чтобы проверить доступность.
             self.connection = True  # Устанавливаем флаг, что соединение успешное.
             logger.info(f'Successfully connected to {network_path}')
@@ -133,34 +169,45 @@ class SmbHandler:
         with ThreadPoolExecutor() as executor:
             response = await loop.run_in_executor(executor, ping, host)
         return bool(response)
-
-    async def create_network_path_async(self, share: str, path: str = '', host: str = None) -> str:
+    
+    async def create_network_path_async(self, host: str = None, share: str = None, path: str = None) -> str:
         """
         Асинхронно формирует строку сетевого пути на основе указанного сервера, общего ресурса и, при необходимости,
         подкаталога. Если путь не указан, метод составит сетевой путь только до общего ресурса на сервере.
 
-        :param share: Название общего ресурса, к которому требуется доступ.
-        :type share: str
-        :param path: Опциональный подкаталог в общем ресурсе; если не указан, он будет исключен из пути.
-        :type path: str, optional
         :param host: Альтернативное имя сервера; если не указано, используется значение, переданное в объекте при
             создании.
         :type host: str, optional
+        :param share: Название общего ресурса, к которому требуется доступ.
+        :type share: str, optional
+        :param path: Опциональный подкаталог в общем ресурсе; если не указан, он будет исключен из пути.
+        :type path: str, optional
         :return: Сформированный полный сетевой путь в формате UNC.
         :rtype: str
+        :raises ValueError: Если не указаны обязательные параметры host или share.
         """
-        if host is None:
-            host = self.server
-    
+        host = host if host is not None else self.server
+        if not host:
+            if not self.debug_mode:
+                logger.error('Не указано имя сервера.')
+            else:
+                raise ValueError('Не указано имя сервера.')
+        
+        share = share if share is not None else self.share
+        if not share:
+            if not self.debug_mode:
+                logger.error('Не указано название общего ресурса.')
+            else:
+                raise ValueError('Не указано название общего ресурса.')
+        
+        path = path if path is not None else self.remote_path
+        
+        network_path = fr'\\{host}\{share}'
         if path:
-            # Если путь не пустой, добавляем его
-            network_path = r'\\{}\{}\{}'.format(host, share, path)
-        else:
-            # Если путь пустой, игнорируем его
-            network_path = r'\\{}\{}'.format(host, share)
+            network_path += fr'\{path}'
         
         return network_path
-
+    
     @staticmethod
     def _find_file_by_pattern(directory: str, file_pattern: str) -> Union[str, None]:
         """
@@ -195,23 +242,26 @@ class SmbHandler:
         except Exception as e:
             logger.error(f'Error accessing {directory}: {e}')
         return None
-
     
-    async def copy_files(
-            self, network_path: str, file_pattern: str, download_path: str, download_file_name: str,
-            host: str = None) -> Union[str, bool]:
+    async def copy_files(self, host: Optional[str] = None, network_path: Optional[str] = None,
+            file_pattern: Optional[str] = None, download_path: Optional[str] = None,
+            download_file_name: Optional[str] = None) -> Union[str, bool]:
         """
-        Асинхронное копирование файлов с удаленного сетевого пути на локальный диск.
+        Асинхронно копирует файл с удаленного сервера на локальную машину.
 
-        :param network_path: Строка, представляющая путь к директории на сетевом ресурсе, откуда необходимо
-            копировать файлы.
-        :param file_pattern: Шаблон имени файла для идентификации файлов, которые нужно скопировать.
-        :param download_path: Локальный путь, куда будет сохранен скопированный файл.
-        :param download_file_name: Имя файла, под которым будет сохранена копия на локальном диске.
-        :param host: Опциональный параметр, представляющий хост или имя сервера. Если не задан, используется сервер
-            по умолчанию.
+        :param host: Название сервера. Если не указано, используется значение self.server.
+        :type host: Optional[str]
+        :param network_path: Путь к удаленной директории. Если не указано, используется значение self.network_path.
+        :type network_path: Optional[str]
+        :param file_pattern: Шаблон поиска файла. Если не указано, используется значение self.file_pattern.
+        :type file_pattern: Optional[str]
+        :param download_path: Локальный путь для сохранения файла. Если не указано, используется значение self.download_path.
+        :type download_path: Optional[str]
+        :param download_file_name: Имя файла для сохранения. Если не указано, используется значение self.download_file_name.
+        :type download_file_name: Optional[str]
 
-        :return: Путь к сохраненному файлу, если копирование прошло успешно, иначе возвращает False.
+        :return: Путь к сохраненному файлу, если копирование успешно, иначе False.
+        :rtype: Union[str, bool]
 
         :raises OSError: В случае проблем с файловой системой.
         :raises PermissionError: Если нет доступа к файлам на сетевом пути.
@@ -227,6 +277,18 @@ class SmbHandler:
         """
         if host is None:
             host = self.server
+            
+        if network_path is None:
+            network_path = self.network_path
+            
+        if file_pattern is None:
+            file_pattern = self.file_pattern
+            
+        if download_path is None:
+            download_path = self.download_path
+            
+        if download_file_name is None:
+            download_file_name = self.download_file_name
         
         file_path = os_join(download_path, download_file_name)
         await make_dir(os_join(Path.cwd(), download_path))
@@ -253,6 +315,8 @@ class SmbHandler:
                 logger.info(f'{host}: Copying "{entry}" to "{Path(file_path).name}"')
                 
                 attempt = 0
+                file_written = False  # Инициализация переменной
+
                 while attempt < self.max_retries:
                     try:
                         # Открытие исходного файла через SMB
@@ -330,25 +394,38 @@ class SmbHandler:
             logger.warning(f'{host}: Waiting {wait_time} seconds for file: {src_file_path}')
             await aio_sleep(wait_time)
             return True
-    
-    @staticmethod
-    async def file_has_been_updated(network_path: str, local_file_path: str, file_name: str) -> bool:
+
+    # TODO: Требуется добавить имя файла на удаленном сервере (полученное по шаблону)
+    async def file_has_been_updated(
+            self, network_path: Optional[str] = None, local_file_path: Optional[str] = None, file_name: Optional[str]
+            = None) -> bool:
         """
         Проверяет, обновился ли файл на удаленном сервере с момента последнего копирования на локальный диск.
 
         :param network_path: Сетевой путь к директории на сервере.
-        :type network_path: str
+        :type network_path: str, optional
         :param local_file_path: Путь к локальному файлу, с которым сравнивается удаленный.
-        :type local_file_path: str
+        :type local_file_path: str, optional
         :param file_name: Имя файла для проверки.
-        :type file_name: str
+        :type file_name: str, optional
         
         :return: True, если файл на сервере был обновлён, иначе False.
         :rtype: bool
         """
+        if network_path is None:
+            network_path = self.network_path
+            
+        if local_file_path is None:
+            local_file_path = self.download_path
+
+        if file_name is None:
+            file_name = self.download_file_name
+            
         try:
             remote_file_path = os_join(network_path, file_name)
             local_file_mtime = os_getmtime(local_file_path)
+            
+            logger.warning(f'remote_file_path: {remote_file_path} | local_file_path: {local_file_path}')
             
             with open_file(remote_file_path, mode='rb') as remote_file:
                 remote_file_mtime = remote_file.last_write_time

@@ -1,12 +1,12 @@
 __author__ = 'InfSub'
 __contact__ = 'ADmin@TkYD.ru'
 __copyright__ = 'Copyright (C) 2024, [LegioNTeaM] InfSub'
-__date__ = '2024/12/22'
+__date__ = '2025/01/17'
 __deprecated__ = False
 __email__ = 'ADmin@TkYD.ru'
 __maintainer__ = 'InfSub'
 __status__ = 'Development'  # 'Production / Development'
-__version__ = '2.8.1'
+__version__ = '2.8.3'
 
 from asyncio import run as aio_run, sleep as aio_sleep, create_task as aio_create_task, gather as aio_gather
 # from asyncio import get_event_loop as aio_get_event_loop
@@ -59,6 +59,7 @@ async def perform_smb_task(srv_status: AsyncKeyValueStore, shop_id: str) -> None
     valid_records: Optional[List[Dict[str, Any]]] = None
     smb_config: Dict[str, Union[str, bool]] = {
         'host': hostname,
+        'port': env['port'],
         'username': env['user'],
         'password': env['password'],
         'share': env['share'],
@@ -68,7 +69,8 @@ async def perform_smb_task(srv_status: AsyncKeyValueStore, shop_id: str) -> None
         'download_path': env['to_path'],
         'download_file_name': shop_id + Path(env['file_pattern']).suffix,
         # 'download_file_name': shop_id,
-        # 'multiple': env['multiple']
+        # 'multiple': env['multiple'],
+        'debug_mode': debug_mode,
     }
 
     try:

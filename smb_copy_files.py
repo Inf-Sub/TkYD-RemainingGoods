@@ -1,12 +1,12 @@
 __author__ = 'InfSub'
 __contact__ = 'ADmin@TkYD.ru'
 __copyright__ = 'Copyright (C) 2024, [LegioNTeaM] InfSub'
-__date__ = '2024/12/22'
+__date__ = '2025/01/17'
 __deprecated__ = False
 __email__ = 'ADmin@TkYD.ru'
 __maintainer__ = 'InfSub'
 __status__ = 'Production'
-__version__ = '2.8.1'
+__version__ = '2.8.3'
 
 from typing import Dict, Union
 from pathlib import Path
@@ -38,36 +38,22 @@ async def run_smb_copy(config: Dict[str, Union[str, bool]]) -> Union[str, bool]:
     Returns:
         Union[str, bool]: Путь к загруженному файлу в случае успеха или False, если сервер недоступен.
     """
-    smb_handler = SmbHandler(config['host'], config['username'], config['password'])
-    # smb_handler = SmbHandler(config)  # for ver.: 2.9.x
-    
-    if await smb_handler.async_ping(config['host']):
-        logger.info(f'Хост: {config['host']} - доступен. Подключение к сетевой шаре {config['share']} ...')
-        
-        config['network_path'] = await smb_handler.create_network_path_async(share=config['share'],
-            path=config['remote_path'], host=config['host'])
-        
-        if await smb_handler.connect(config['network_path']):
-            file_name = config['download_file_name']
-            
+    smb_handler = SmbHandler(config)
+
+    if await smb_handler.connect_and_prepare():
+        if await smb_handler.connect():
             # # ver.: 2.9.0
-            # if await smb_handler.file_has_been_updated(
-            #         network_path=config['network_path'], local_file_path=config['download_path'], file_name=file_name):
-            #     logger.info(f'The file {file_name} has been updated on the server.')
+            # TODO: Требуется добавить имя файла на удаленном сервере (полученное по шаблону)
+            # if await smb_handler.file_has_been_updated():
+            #     logger.info(f'The file {config['download_file_name']} has been updated on the server.')
             # else:
-            #     logger.info(f'No update detected for {file_name}.')
+            #     logger.info(f'No update detected for {config['download_file_name']}.')
             #
-            #     file_path = await smb_handler.copy_files(
-            #         host=config['host'], network_path=config['network_path'], file_pattern=config['file_pattern'],
-            #         download_path=config['download_path'], download_file_name=config['download_file_name']
-            #     )
+            #     file_path = await smb_handler.copy_files()
             #     await smb_handler.disconnect()
             #     return file_path
-            
-            # ver.: 2.8.1
-            file_path = await smb_handler.copy_files(host=config['host'], network_path=config['network_path'],
-                file_pattern=config['file_pattern'], download_path=config['download_path'],
-                download_file_name=config['download_file_name'])
+
+            file_path = await smb_handler.copy_files()
             await smb_handler.disconnect()
             return file_path
     
